@@ -43,3 +43,28 @@ def edge_verify_output(state: AgentState) -> str:
     else:
         print("⚠️  Groundedness failed - regenerating with stricter prompt")
         return "regenerate_strict"
+
+def edge_route_after_completeness(state: AgentState) -> str:
+    """
+    Route based on answer completeness.
+    If answer is incomplete (e.g., 'context does not specify'), expand search to all sources.
+    """
+    is_complete = state.get("is_answer_complete", True)
+    retry_count = state.get("retrieval_loop_count", 0)
+    expanded_used = state.get("expanded_search_used", False)
+    
+    print(f"🔀 [Edge: Route Completeness] is_complete={is_complete}, retry={retry_count}, expanded={expanded_used}")
+    
+    # Prevent infinite loops - only expand once
+    if retry_count >= 2 or expanded_used:
+        print("   → Proceeding to output verification (max retries or already expanded)")
+        return "regenerate_strict"
+    
+    # If incomplete and haven't expanded yet, expand search to all sources
+    if not is_complete:
+        print("   → Expanding search to all sources")
+        return "expand_all_sources"
+    
+    # Otherwise proceed to validation
+    print("   → Answer complete, proceeding to verification")
+    return "regenerate_strict"

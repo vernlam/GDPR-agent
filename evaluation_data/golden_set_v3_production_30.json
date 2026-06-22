@@ -23,11 +23,19 @@
           "legislation"
         ],
         "must_retrieve_from_articles": [
-          "General Modalities Context"
-        ],
+        "Section 6: Modalities, Operational Controls, and Transparent Communications (Article 12)",
+        "Section 8: The Data Subject Rights Framework (Articles 15 - 20)",
+        "Article 15",
+        "Article 17",
+        "Article 19"
+    ],
         "must_include_in_answer": [
-          "General Modalities Context"
-        ]
+        "1-month response timeline (with a potential 2-month extension)",
+        "Processed free of charge unless manifestly unfounded or excessive",
+        "Provide confirmation of processing and a complete electronic copy for access requests",
+        "Purge records from production and downstream vendors for deletion requests",
+        "The legal override exception for financial transaction logs (7-year corporate tax lock)"
+      ]
       },
       "evaluation_method": "Verify General Modalities Context presence via article_title metadata partition.",
       "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
@@ -707,13 +715,14 @@
         },
         "fines_check": {
           "must_retrieve_keywords": [
-            "fine",
-            "breach"
+            "complainant",
+            "address",
+            "accuracy"
           ]
         },
         "must_include_in_answer": [
           "Right to rectification",
-          "fine"
+          "accuracy principle"
         ]
       },
       "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
