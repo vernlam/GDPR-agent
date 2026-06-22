@@ -9,6 +9,7 @@ def main():
     parser.add_argument("--endpoint", required=True, help="Model serving endpoint name")
     parser.add_argument("--dataset", required=True, help="Path to test dataset JSON")
     parser.add_argument("--threshold", type=float, default=0.90, help="Pass rate threshold (default: 0.90)")
+    parser.add_argument("--experiment", default=None, help="MLflow experiment name")
     parser.add_argument("--output", default="./eval_results.csv", help="Output CSV path")
     parser.add_argument("--report", default="./eval_report.txt", help="Report output path")
     
@@ -22,7 +23,8 @@ def main():
     try:
         runner = EvaluationRunner(
             endpoint_name=args.endpoint,
-            dataset_path=args.dataset
+            dataset_path=args.dataset,
+            experiment_name=args.experiment
         )
         
         results_df = runner.run_evaluation()
