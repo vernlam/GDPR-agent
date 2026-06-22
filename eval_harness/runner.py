@@ -53,7 +53,7 @@ class EvaluationRunner:
                 }
                 
                 try:
-                    final_state = self.agent_app.invoke(state)
+                    final_state = self.agent.invoke(state)
                     agent_response = {
                         "answer": final_state.get("generated_answer", ""),
                         "context": final_state.get("retrieved_context", "")
