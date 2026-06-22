@@ -61,7 +61,7 @@ def grade_answer_groundedness(generated_answer: str, retrieved_context: str) -> 
     print(f"\n📄 CONTEXT LENGTH: {len(retrieved_context)} chars")
     print(f"📝 ANSWER LENGTH: {len(generated_answer)} chars")
     
-    prompt = f"""You are a compliance risk assessor. Compare the generated answer against the approved retrieved context. Determine if the generated answer contains ANY claims, assumptions, or facts that are NOT explicitly stated or directly backed by the retrieved context.
+    prompt = f"""You are an expert compliance risk assessor. Compare the generated answer against the approved retrieved context. Determine if the generated answer contains ANY claims, assumptions, or facts that are NOT explicitly stated or directly backed by the retrieved context.
 
     Retrieved Context:
     {retrieved_context}
