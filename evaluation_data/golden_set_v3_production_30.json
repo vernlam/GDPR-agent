@@ -330,19 +330,19 @@
           "fines"
         ],
         "must_retrieve_keywords": [
-          "british airways",
+          "LastPass",
           "fine",
           "security"
         ],
         "must_include_in_answer": [
-          "British Airways",
+          "LastPass",
           "fine"
         ]
       },
       "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
       "data_source": "Confirmed via main.default.gdpr_translated_chunks",
       "generation_method": "manual_override",
-      "notes": "Swapped duplicate case to target British Airways security incident conceptual boundary."
+      "notes": "Swapped duplicate case to target LastPass security incident conceptual boundary."
     },
     {
       "id": "case_016",

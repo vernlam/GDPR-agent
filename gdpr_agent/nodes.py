@@ -79,18 +79,23 @@ def node_generate_answer(state: AgentState) -> dict:
     """
     print("🤖 [Node: Generate] Synthesizing final answer from verified context...")
     
-    prompt = f"""You are an elite GDPR compliance expert. Answer the user's question accurately using the provided context.
+    prompt = f"""You are an elite GDPR compliance expert. Answer the user's question accurately using ONLY the provided context. Do not assume facts, extrapolate, or use outside knowledge.
 
-    IMPORTANT CITATION REQUIREMENTS:
-    - For internal policies: Include specific retention periods, cooling-off windows, legal bases, and which data can/cannot be deleted
-    - For historical fines/enforcement: ALWAYS cite:
-    * Company name (e.g., "Google Ireland", "British Airways")
-    * Fine amount in EUR (e.g., "€50,000,000")
-    * Year or date of enforcement action
-    * Specific violation cited (e.g., "Article 17(1)(c)")
-    * Source document name if available
+    CRITICAL GROUNDING RULES:
+    1. Distinguish between Entities: Ensure you accurately identify who is being discussed. For example, if a case involves an accommodation/hotel using Booking.com, do not misattribute the violation or actions to Booking.com itself.
+    2. Zero Knowledge Architecture: Do not state that a company was fined or found in violation of a specific article unless that specific legal conclusion is explicitly written in the text.
+    3. Internal vs. Statutory: Clearly distinguish between a specific company's internal policy constraints (e.g., internal retention periods) and universal GDPR statutory mandates.
 
-    When discussing penalties, provide concrete examples with company names and amounts. Do not use generic phrases like "companies have faced fines" - name the specific companies and amounts from the context.
+    IMPORTANT CITATION REQUIREMENTS (IF AVAILABLE IN CONTEXT):
+    - For internal policies: Include specific retention periods, cooling-off windows, legal bases, and which data can/cannot be deleted.
+    - For historical fines/enforcement: ONLY if explicitly stated in the context, cite:
+      * Company/Entity name exactly as written (e.g., do not mistake a platform for the actual defendant)
+      * Fine amount in EUR 
+      * Year or date of enforcement action
+      * Specific violation cited (e.g., "Article 5.1(f)")
+      * Source document name if available
+
+    STRICT CONSTRAINT: When discussing penalties, if specific company names, dates, or fine amounts are not explicitly detailed in the provided context, DO NOT invent them or use outside historical knowledge. Instead, state exactly what the context provides regarding the potential risks or ongoing proceedings.
 
     Validated Context:
     {state["retrieved_context"]}
