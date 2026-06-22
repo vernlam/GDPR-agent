@@ -1,7 +1,9 @@
+import mlflow
 from . import config
 # ============================================================================
 # PRODUCTION TOOL 1: Historical Fines
 # ============================================================================
+@mlflow.trace(name="tool_search_historical_fines", span_type="RETRIEVER")
 def tool_search_historical_fines(query_text: str, query_vector: list = None, top_k: int = 3):
     """
     Searches historical data on GDPR breaches, legal precedents, enforcement actions, 
@@ -27,6 +29,7 @@ def tool_search_historical_fines(query_text: str, query_vector: list = None, top
 # ============================================================================
 # PRODUCTION TOOL 2: GDPR Legislation
 # ============================================================================
+@mlflow.trace(name="tool_search_gdpr_legislation", span_type="RETRIEVER")
 def tool_search_gdpr_legislation(query_text: str, query_vector: list = None, top_k: int = 3):
     """
     Searches official legal articles, statutory text, and clauses of the GDPR 
@@ -48,6 +51,7 @@ def tool_search_gdpr_legislation(query_text: str, query_vector: list = None, top
 # ============================================================================
 # PRODUCTION TOOL 3: Internal Corporate Policy
 # ============================================================================
+@mlflow.trace(name="tool_search_retail_policy", span_type="RETRIEVER")
 def tool_search_retail_policy(query_text: str, query_vector: list = None, top_k: int = 3):
     """
     Searches internal company guidelines, retail store operational privacy policies, 

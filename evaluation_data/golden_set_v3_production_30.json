@@ -1,0 +1,725 @@
+{
+  "metadata": {
+    "version": "3.0",
+    "created_date": "2026-06-19 01:42:52",
+    "description": "Expanded 30-case evaluation set using OpenAI Client integration via dbutils secrets",
+    "generation_method": "source_table_sampling_with_llm_paraphrasing",
+    "llm_model": "openai-configured-model",
+    "total_cases": 30,
+    "source_tables": {
+      "legislation": "main.default.gdpr_statutory_legislation",
+      "fines": "main.default.gdpr_translated_chunks",
+      "policy": "main.default.retail_corporate_policy"
+    }
+  },
+  "test_cases": [
+    {
+      "id": "case_001",
+      "question": "How should our company handle requests from individuals who want to access or delete their personal information that we have collected?",
+      "category": "single_source_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "General Modalities Context"
+        ],
+        "must_include_in_answer": [
+          "General Modalities Context"
+        ]
+      },
+      "evaluation_method": "Verify General Modalities Context presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: General Modalities Context"
+    },
+    {
+      "id": "case_002",
+      "question": "How should our company ensure that we provide clear and accessible information to users about their rights and how they can manage their personal data with us?",
+      "category": "single_source_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Transparent information, communication and modalities for the exercise of the rights of the data subject"
+        ],
+        "must_include_in_answer": [
+          "Transparent information, communication and modalities for the exercise of the rights of the data subject"
+        ]
+      },
+      "evaluation_method": "Verify Transparent information, communication and modalities for the exercise of the rights of the data subject presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Transparent information, communication and modalities for the exercise of the rights of the data subject"
+    },
+    {
+      "id": "case_003",
+      "question": "What details are we required to share with individuals when we initially gather their personal information?",
+      "category": "single_source_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Information to be provided where personal data are collected from the data subject"
+        ],
+        "must_include_in_answer": [
+          "Information to be provided where personal data are collected from the data subject"
+        ]
+      },
+      "evaluation_method": "Verify Information to be provided where personal data are collected from the data subject presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Information to be provided where personal data are collected from the data subject"
+    },
+    {
+      "id": "case_004",
+      "question": "What are the obligations for informing individuals when we collect their personal information from third-party sources instead of directly from them?",
+      "category": "single_source_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Information to be provided where personal data have not been obtained from the data subject"
+        ],
+        "must_include_in_answer": [
+          "Information to be provided where personal data have not been obtained from the data subject"
+        ]
+      },
+      "evaluation_method": "Verify Information to be provided where personal data have not been obtained from the data subject presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Information to be provided where personal data have not been obtained from the data subject"
+    },
+    {
+      "id": "case_005",
+      "question": "How can our customers request to see the personal information we have collected about them, and what is our obligation in responding to such requests?",
+      "category": "single_source_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Right of access by the data subject"
+        ],
+        "must_include_in_answer": [
+          "Right of access by the data subject"
+        ]
+      },
+      "evaluation_method": "Verify Right of access by the data subject presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right of access by the data subject"
+    },
+    {
+      "id": "case_006",
+      "question": "How should we handle a situation where a customer requests corrections to their personal information in our records to ensure we comply with data protection regulations?",
+      "category": "single_source_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Right to rectification"
+        ],
+        "must_include_in_answer": [
+          "Right to rectification"
+        ]
+      },
+      "evaluation_method": "Verify Right to rectification presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right to rectification"
+    },
+    {
+      "id": "case_007",
+      "question": "How should we handle a request from a customer who wants all their personal information deleted from our systems in accordance with data protection laws?",
+      "category": "single_source_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Right to erasure ('right to be forgotten')"
+        ],
+        "must_include_in_answer": [
+          "Right to erasure ('right to be forgotten')"
+        ]
+      },
+      "evaluation_method": "Verify Right to erasure ('right to be forgotten') presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right to erasure ('right to be forgotten')"
+    },
+    {
+      "id": "case_008",
+      "question": "How should we handle a situation where a customer requests that we temporarily halt the use of their personal information while they dispute its accuracy?",
+      "category": "single_source_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "legislation"
+        ],
+        "must_retrieve_from_articles": [
+          "Right to restriction of processing"
+        ],
+        "must_include_in_answer": [
+          "Right to restriction of processing"
+        ]
+      },
+      "evaluation_method": "Verify Right to restriction of processing presence via article_title metadata partition.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right to restriction of processing"
+    },
+    {
+      "id": "case_009",
+      "question": "Can you explain some of the most significant penalties imposed for non-compliance with data protection regulations and what lessons we can learn from those cases?",
+      "category": "single_source_fines",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "fine",
+          "\u20ac",
+          "company"
+        ],
+        "must_include_in_answer": [
+          "largest GDPR fines",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: largest GDPR fines"
+    },
+    {
+      "id": "case_010",
+      "question": "How should we handle a situation where a user requests the deletion of their personal information from our social media platform to ensure we comply with data protection regulations?",
+      "category": "single_source_fines",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "facebook",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Facebook",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Facebook"
+    },
+    {
+      "id": "case_011",
+      "question": "How should we handle a situation where a customer requests the deletion of their personal information from our records, and what are the potential consequences if we fail to comply with such a request under data protection regulations?",
+      "category": "single_source_fines",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "google",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Google",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Google"
+    },
+    {
+      "id": "case_012",
+      "question": "How should we handle situations where a regulatory body investigates our practices for potentially mishandling user information?",
+      "category": "single_source_fines",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "meta",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Meta",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Meta"
+    },
+    {
+      "id": "case_013",
+      "question": "How should our messaging service handle user requests to delete their personal information to ensure we are adhering to privacy regulations?",
+      "category": "single_source_fines",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "whatsapp",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Whatsapp",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Whatsapp"
+    },
+    {
+      "id": "case_014",
+      "question": "How should we handle a situation where a customer requests access to their stored information, and what are the potential consequences if we fail to comply with such a request?",
+      "category": "single_source_fines",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "amazon",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Amazon",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Amazon"
+    },
+    {
+      "id": "case_015",
+      "question": "What are the regulatory consequences and lesson learned if our customer data is compromised due to poor security arrangements on our booking or digital platforms?",
+      "category": "single_source_fines",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "british airways",
+          "fine",
+          "security"
+        ],
+        "must_include_in_answer": [
+          "British Airways",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "manual_override",
+      "notes": "Swapped duplicate case to target British Airways security incident conceptual boundary."
+    },
+    {
+      "id": "case_016",
+      "question": "How should our company handle a situation where an individual requests the deletion of their personal information from our records, and what are the potential consequences if we fail to comply with such a request under data protection regulations?",
+      "category": "single_source_fines",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines"
+        ],
+        "must_retrieve_keywords": [
+          "google",
+          "fine"
+        ],
+        "must_include_in_answer": [
+          "Google",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Keyword validation in matched chunks via hybrid tracker text.",
+      "data_source": "Confirmed via main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Google"
+    },
+    {
+      "id": "case_017",
+      "question": "How should our company handle situations where individuals request the deletion of their personal information from our records?",
+      "category": "single_source_policy",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Global Policy Overview"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Global Policy Overview' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Global Policy Overview"
+    },
+    {
+      "id": "case_018",
+      "question": "How should we handle requests from individuals who want to access or update their personal information within our internal systems to ensure we comply with data protection regulations?",
+      "category": "single_source_policy",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Customer Identity and Core Account Profiles"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Customer Identity and Core Account Profiles' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Customer Identity and Core Account Profiles"
+    },
+    {
+      "id": "case_019",
+      "question": "How should our company handle the use of tracking technologies and personalized data collection to ensure we are respecting user privacy and adhering to data protection regulations?",
+      "category": "single_source_policy",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Marketing Telemetry, Cookies, and Behavioral Profiling"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Marketing Telemetry, Cookies, and Behavioral Profiling' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Marketing Telemetry, Cookies, and Behavioral Profiling"
+    },
+    {
+      "id": "case_020",
+      "question": "How should we handle the collection and use of location data and app usage statistics from employees' mobile devices to ensure we comply with privacy regulations?",
+      "category": "single_source_policy",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Device Geolocation and Native App Telemetry"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Device Geolocation and Native App Telemetry' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Device Geolocation and Native App Telemetry"
+    },
+    {
+      "id": "case_021",
+      "question": "How should we handle and protect the financial transaction details of our customers to ensure we are adhering to privacy regulations?",
+      "category": "single_source_policy",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Payment Records and Transaction Histories"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Payment Records and Transaction Histories' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Payment Records and Transaction Histories"
+    },
+    {
+      "id": "case_022",
+      "question": "How should our in-store systems handle customer requests to delete their personal information to ensure we are following privacy regulations?",
+      "category": "single_source_policy",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Brick-and-Mortar Store Operations & Point of Sale (POS) Systems"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Brick-and-Mortar Store Operations & Point of Sale (POS) Systems' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Brick-and-Mortar Store Operations & Point of Sale (POS) Systems"
+    },
+    {
+      "id": "case_023",
+      "question": "How should we ensure that our company's procedures for handling customer data requests are clear and easily accessible to meet regulatory expectations?",
+      "category": "single_source_policy",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Modalities, Operational Controls, and Transparent Communications (Article 12)"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Modalities, Operational Controls, and Transparent Communications (Article 12)' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Modalities, Operational Controls, and Transparent Communications (Article 12)"
+    },
+    {
+      "id": "case_024",
+      "question": "How should our company inform individuals about the data we collect from them directly or receive from other sources, and what specific details are we required to provide to ensure transparency and compliance with privacy regulations?",
+      "category": "single_source_policy",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "policy"
+        ],
+        "must_retrieve_from_sections": [
+          "Statutory Disclosures for Direct and Indirect Data Collection (Articles 13 & 14)"
+        ],
+        "must_include_in_answer": [
+          "policy"
+        ]
+      },
+      "evaluation_method": "Check if corporate section title 'Statutory Disclosures for Direct and Indirect Data Collection (Articles 13 & 14)' matches retrieved records.",
+      "data_source": "Confirmed via main.default.retail_corporate_policy",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Statutory Disclosures for Direct and Indirect Data Collection (Articles 13 & 14)"
+    },
+    {
+      "id": "case_025",
+      "question": "How do organizations ensure their data processing activities align with both GDPR principles and industry standards, and what are the common challenges they face in maintaining this alignment across different regulatory environments?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "General Modalities Context"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "General Modalities Context",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: General Modalities Context compliance alignment"
+    },
+    {
+      "id": "case_026",
+      "question": "How do organizations ensure they are providing clear and accessible information to individuals about their data rights, and what are some examples of penalties faced by companies for failing to adequately communicate these rights?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "Transparent information, communication and modalities for the exercise of the rights of the data subject"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "Transparent information, communication and modalities for the exercise of the rights of the data subject",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Transparent information, communication and modalities for the exercise of the rights of the data subject compliance alignment"
+    },
+    {
+      "id": "case_027",
+      "question": "How should a company ensure they are providing the necessary details to individuals when collecting their personal data, and what are some examples of penalties faced by organizations that failed to meet these requirements?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "Information to be provided where personal data are collected from the data subject"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "Information to be provided where personal data are collected from the data subject",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Information to be provided where personal data are collected from the data subject compliance alignment"
+    },
+    {
+      "id": "case_028",
+      "question": "How should organizations handle informing individuals when their data is collected indirectly, and what are the potential consequences if they fail to meet these obligations?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "Information to be provided where personal data have not been obtained from the data subject"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "Information to be provided where personal data have not been obtained from the data subject",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Information to be provided where personal data have not been obtained from the data subject compliance alignment"
+    },
+    {
+      "id": "case_029",
+      "question": "How do organizations ensure they meet the requirements for providing individuals with their personal data upon request, and what are the common challenges they face in aligning with both regulatory standards and actual data management practices?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "easy",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "Right of access by the data subject"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "Right of access by the data subject",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right of access by the data subject compliance alignment"
+    },
+    {
+      "id": "case_030",
+      "question": "How do organizations ensure they are meeting the requirements for correcting inaccurate personal data, and what are some real-world examples of consequences faced by companies that failed to implement these corrections promptly?",
+      "category": "multi_source_fines_legislation",
+      "difficulty": "medium",
+      "expected_behavior": {
+        "sources": [
+          "fines",
+          "legislation"
+        ],
+        "legislation_check": {
+          "must_retrieve_from_articles": [
+            "Right to rectification"
+          ]
+        },
+        "fines_check": {
+          "must_retrieve_keywords": [
+            "fine",
+            "breach"
+          ]
+        },
+        "must_include_in_answer": [
+          "Right to rectification",
+          "fine"
+        ]
+      },
+      "evaluation_method": "Hybrid Evaluation Block: Confirm legislative metadata context and fine records.",
+      "data_source": "Confirmed via main.default.gdpr_statutory_legislation & main.default.gdpr_translated_chunks",
+      "generation_method": "llm_paraphrased",
+      "notes": "Automated adversarial query targeting conceptual boundary of: Right to rectification compliance alignment"
+    }
+  ]
+}
