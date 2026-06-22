@@ -53,10 +53,10 @@ class EvaluationRunner:
                 }
                 
                 try:
-                    final_state = self.agent.invoke(state)
+                    result = self.agent.invoke({"question": test_case["question"]})
                     agent_response = {
-                        "answer": final_state.get("generated_answer", ""),
-                        "context": final_state.get("retrieved_context", "")
+                        "answer": result.get("generated_answer", ""),
+                        "context": result.get("retrieved_context", "")
                     }
                 except Exception as e:
                     print(f"❌ Agent error: {e}")
