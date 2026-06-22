@@ -3,6 +3,7 @@ from .state import AgentState
 from .tools import tool_search_retail_policy, tool_search_gdpr_legislation, tool_search_historical_fines
 from . import config
 from .router import route_query
+import mlflow
 
 
 # ============================================================================
@@ -29,8 +30,7 @@ def node_route_and_retrieve(state: AgentState) -> dict:
             policy_results = tool_search_retail_policy(query_text=query_to_search, top_k=3)
             policy_rows = policy_results.get('result', {}).get('data_array', [])
             for row in policy_rows:
-                # row[-1] is similarity score, row[0] is title, row[1] is text
-                if row[-1] > 0.35:  # Soft math filter to eliminate pure noise
+                if row[-1] > 0.35:  
                     retrieved_contexts.append(f"[SOURCE: Internal Retail Policy | Section: {row[0]}]\nContent: {row[1]}")
         except Exception as e:
             print(f"⚠️ Policy search warning: {e}")
@@ -71,6 +71,7 @@ def node_route_and_retrieve(state: AgentState) -> dict:
 # ============================================================================
 # LANGGRAPH NODE: Generate Answer
 # ============================================================================
+@mlflow.trace(name="generate_answer",span_type="LLM")
 def node_generate_answer(state: AgentState) -> dict:
     """
     LangGraph Node: Takes the validated context from the state 
@@ -98,7 +99,7 @@ def node_generate_answer(state: AgentState) -> dict:
 
     Answer:"""
 
-    response = config.openai_client.chat.completions.create(  # ✅ Using your initialized openai_client
+    response = config.openai_client.chat.completions.create(  
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2
@@ -109,7 +110,7 @@ def node_generate_answer(state: AgentState) -> dict:
         "generation_loop_count": state.get("generation_loop_count", 0) + 1
     }
     
-
+@mlflow.trace(name="regenerate_answer_strict",span_type="LLM")
 def node_regenerate_strict(state: AgentState) -> dict:
     """
     Regenerates answer with stricter citation requirements when groundedness fails.
@@ -135,7 +136,7 @@ def node_regenerate_strict(state: AgentState) -> dict:
     response = config.openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.0  # ✅ Lower temperature for more careful generation
+        temperature=0.0 
     )
     
     return {
@@ -146,6 +147,7 @@ def node_regenerate_strict(state: AgentState) -> dict:
 # ============================================================================
 # LANGGRAPH NODE: Rewrite Query
 # ============================================================================
+mlflow.trace(name="rewrite_query",span_type="LLM")
 def node_rewrite_query(state: AgentState) -> dict:
     """
     LangGraph Node: If a check fails, reformulates the current query 
@@ -158,7 +160,7 @@ def node_rewrite_query(state: AgentState) -> dict:
 Original Question: {state["original_question"]}
 Optimized Search Query:"""
 
-    response = config.openai_client.chat.completions.create(  # ✅ Using your initialized openai_client
+    response = config.openai_client.chat.completions.create( 
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2

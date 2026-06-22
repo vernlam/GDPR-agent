@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 import json
+import mlflow
 from . import config
 
 class RelevanceGrade(BaseModel):
@@ -13,6 +14,7 @@ class GroundednessGrade(BaseModel):
 # ============================================================================
 # UTILITY HELPER 1: Retrieval Grader
 # ============================================================================
+@mlflow.trace(name="grade_retrieval", span_type="LLM")
 def grade_retrieved_context(user_question: str, retrieved_context: str) -> bool:
     """
     Evaluates whether the retrieved context is relevant and contains useful info
@@ -51,6 +53,7 @@ def grade_retrieved_context(user_question: str, retrieved_context: str) -> bool:
 # ============================================================================
 # UTILITY HELPER 2: Hallucination & Groundedness Grader
 # ============================================================================
+@mlflow.trace(name="grade_answer_groundedness",span_type="LLM")
 def grade_answer_groundedness(generated_answer: str, retrieved_context: str) -> bool:
     """
     Verifies that the generated answer is strictly supported by the context, 
