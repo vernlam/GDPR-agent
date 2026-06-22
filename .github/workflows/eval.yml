@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'gdpr-agent/**'
+      - 'gdpr_agent/**'
       - 'evaluation_data/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'gdpr-agent/**'
+      - 'gdpr_agent/**'
       - 'evaluation_data/**'
   workflow_dispatch:
 jobs:
