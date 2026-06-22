@@ -37,11 +37,13 @@ jobs:
       env:
         DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
         DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        MLFLOW_TRACKING_URI: databricks
       run: |
         python -m eval_harness.cli \
           --endpoint gdpr-agent-endpoint \
           --dataset evaluation_data/golden_set_v3_production_30.json \
           --threshold 0.90 \
+          --experiment "/Shared/gdpr-agent-ci-evaluation" \
           --output evaluation_results.csv \
           --report evaluation_report.txt
     
