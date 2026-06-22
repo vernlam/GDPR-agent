@@ -15,3 +15,12 @@ I implemented BM25 Search in order to capture the actual case law titles, compan
 
 ### Groundedness Check
 It is preferntial for the groundedness check used an ugpraded model `gpt-4o` as opposed to `gpt-4o-mini` as its the step that requires greater accuracy, to eliminate hallucination risk. If the generation fails the groundedness check, the agent routes to a stricter generation node `node_regenerate_strict` which has a more strict prompt. However, for the purposes of limiting the cost, I have left it as a smaller model.
+
+### Evaluation Harness & CI/CD Pipeline
+I built a standalone evaluation harness as a Python package (`eval_harness/`) to automate pre-production validation of the GDPR agent. The harness runs test cases from a golden dataset against the serving endpoint, scoring responses on source accuracy and content match. Each test case validates that the agent retrieves information from the correct documents (GDPR statutes, historical fines, or privacy policy) and includes expected content in its answers.
+
+The evaluation harness is integrated into a GitHub Actions CI/CD pipeline that automatically runs on every push to `main` or `develop` when code in `gdpr_agent/`, `eval_harness/`, or `evaluation_data/` changes. The workflow gates deployments with a 90% pass rate threshold - if evaluation scores fall below this, the pipeline fails and blocks the merge. This prevents regressions from reaching production.
+
+All evaluation runs are logged to MLflow experiments, creating a historical record of agent performance over time. Each run captures metrics like pass rate, average score, source accuracy, and category-level breakdowns, along with artifacts including full result CSVs and failed test cases for debugging. This enables tracking performance trends, comparing runs, and identifying degradation patterns across different agent versions.
+
+The modular structure (`evaluator.py`, `runner.py`, `utils.py`, `cli.py`) separates scoring logic, execution orchestration, reporting utilities, and the CLI entry point, making the harness reusable across notebooks, CI/CD, and manual evaluation workflows. This approach ensures consistent validation whether testing locally in Databricks or automatically through GitHub Actions.
