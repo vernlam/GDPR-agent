@@ -1,27 +1,19 @@
 # eval_harness/runner.py
-import importlib
 import sys
 import json
 import pandas as pd
 import mlflow
+import os
 from pathlib import Path
 from datetime import datetime
 from .evaluator import evaluate_case
+from gdpr_agent.agent import GDPRAgent
 
 class EvaluationRunner:
-    def __init__(self, agent_module: str, dataset_path: str, experiment_name: str = None):
-        """
-        agent_module: Python path to agent class (e.g., 'gdpr_agent.agent.GDPRAgent')
-        """
-        self.agent_module = agent_module
+    def __init__(self, dataset_path: str, experiment_name: str = None):
+        """Direct evaluation by importing and building the agent"""
         self.dataset_path = dataset_path
-        
-        # Import agent class from code
-        sys.path.insert(0, str(Path.cwd()))
-        module_path, class_name = agent_module.rsplit('.', 1)
-        module = importlib.import_module(module_path)
-        AgentClass = getattr(module, class_name)
-        self.agent = AgentClass()
+        self.agent = GDPRAgent()
         
         # Set up MLflow
         if experiment_name is None:
@@ -38,22 +30,37 @@ class EvaluationRunner:
         test_cases = dataset["test_cases"][:limit] if limit else dataset["test_cases"]
         
         with mlflow.start_run(run_name=f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}"):
-            mlflow.log_param("agent_module", self.agent_module)
+            mlflow.log_param("evaluation_mode", "direct")
             mlflow.log_param("dataset_path", self.dataset_path)
             mlflow.log_param("num_test_cases", len(test_cases))
             
             results = []
             category_scores = {}
             
-            for test_case in test_cases:
-                print(f"\nCase: {test_case['id']}: {test_case['question'][:80]}...")
+            for idx, test_case in enumerate(test_cases):
+                print(f"\n{'='*80}")
+                print(f"[{idx+1}/{len(test_cases)}] Case: {test_case['id']}")
+                print(f"Question: {test_case['question'][:80]}...")
                 
-                # Call agent directly (not via endpoint)
-                result = self.agent.invoke({"question": test_case["question"]})
-                agent_response = {
-                    "answer": result.get("answer", ""),
-                    "context": result.get("context", "")
+                # Call agent directly using your state structure
+                state = {
+                    "original_question": test_case["question"],
+                    "current_query": test_case["question"],
+                    "retrieved_context": "",
+                    "generated_answer": "",
+                    "retrieval_loop_count": 0,
+                    "generation_loop_count": 0
                 }
+                
+                try:
+                    final_state = self.agent_app.invoke(state)
+                    agent_response = {
+                        "answer": final_state.get("generated_answer", ""),
+                        "context": final_state.get("retrieved_context", "")
+                    }
+                except Exception as e:
+                    print(f"❌ Agent error: {e}")
+                    agent_response = {"answer": "", "context": ""}
                 
                 # Evaluate
                 eval_result = evaluate_case(test_case, agent_response)
@@ -93,10 +100,14 @@ class EvaluationRunner:
             results_df.to_csv("evaluation_results.csv", index=False)
             mlflow.log_artifact("evaluation_results.csv")
             
+            failed_df = results_df[~results_df['passed']]
+            if len(failed_df) > 0:
+                failed_df.to_csv("failed_cases.csv", index=False)
+                mlflow.log_artifact("failed_cases.csv")
+            
             return results_df
     
     def print_summary(self, results_df: pd.DataFrame):
-        """Print evaluation summary"""
         print(f"\n{'='*80}")
         print(f"📊 EVALUATION RESULTS")
         print(f"{'='*80}")
@@ -105,9 +116,3 @@ class EvaluationRunner:
         print(f"Failed: {(~results_df['passed']).sum()}")
         print(f"Pass Rate: {results_df['passed'].mean()*100:.1f}%")
         print(f"Avg Score: {results_df['score'].mean():.2f}")
-        
-        print(f"\n📈 By Category:")
-        print(results_df.groupby('category').agg({
-            'passed': ['sum', 'count'],
-            'score': 'mean'
-        }).round(2))

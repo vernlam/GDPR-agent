@@ -6,8 +6,6 @@ from .utils import generate_report, calculate_metrics
 
 def main():
     parser = argparse.ArgumentParser(description="Run GDPR Agent Evaluation")
-    parser.add_argument("--agent-module", required=True, 
-                       help="Agent module path (e.g., gdpr_agent.agent.GDPRAgent)")
     parser.add_argument("--dataset", required=True, help="Path to test dataset JSON")
     parser.add_argument("--threshold", type=float, default=0.90, help="Pass rate threshold")
     parser.add_argument("--experiment", default=None, help="MLflow experiment path")
@@ -17,12 +15,10 @@ def main():
     args = parser.parse_args()
     
     print(f"🚀 Running GDPR Agent Evaluation (Direct Mode)")
-    print(f"   Agent: {args.agent_module}")
     print(f"   Threshold: {args.threshold * 100}%\n")
     
     try:
         runner = EvaluationRunner(
-            agent_module=args.agent_module,
             dataset_path=args.dataset,
             experiment_name=args.experiment
         )
