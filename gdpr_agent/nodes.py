@@ -99,7 +99,7 @@ def node_generate_answer(state: AgentState) -> dict:
     Answer:"""
 
     response = config.openai_client.chat.completions.create(  # ✅ Using your initialized openai_client
-        model="gpt-4o",  # Higher reasoning model for synthesis
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2
     )
@@ -133,7 +133,7 @@ def node_regenerate_strict(state: AgentState) -> dict:
     Answer:"""
     
     response = config.openai_client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0  # ✅ Lower temperature for more careful generation
     )
