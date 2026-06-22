@@ -3,8 +3,14 @@ name: GDPR Agent Evaluation
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'gdpr-agent/**'
+      - 'evaluation_data/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'gdpr-agent/**'
+      - 'evaluation_data/**'
   workflow_dispatch:
 jobs:
   evaluate:
