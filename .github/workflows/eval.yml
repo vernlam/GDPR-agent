@@ -29,7 +29,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install databricks-sdk pandas
+        pip install databricks-sdk pandas mlflow
         pip install "typing_extensions>=4.9.0"
         pip install databricks-vectorsearch "langgraph>=0.2.0" "langchain-openai>=0.2.0" openai
     
@@ -41,7 +41,7 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         python -m eval_harness.cli \
-          --endpoint gdpr-agent-endpoint \
+          --agent-module gdpr_agent.agent.GDPRAgent \
           --dataset evaluation_data/golden_set_v3_production_30.json \
           --threshold 0.90 \
           --experiment "/Shared/gdpr-agent-ci-evaluation" \
