@@ -12,3 +12,4 @@ class AgentState(TypedDict):
     generation_loop_count: int
     is_answer_complete: bool
     expanded_search_used: bool
+    needs_example_expansion: bool

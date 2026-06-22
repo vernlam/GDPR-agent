@@ -219,6 +219,27 @@ def node_check_completeness(state: AgentState) -> dict:
         "is_answer_complete": not is_incomplete
     }
 
+# ============================================================================
+# CHECK SOURCE COVERAGE NODE
+# ============================================================================
+@mlflow.trace(name="check_source_coverage", span_type="CHAIN")
+def node_check_source_coverage(state: AgentState) -> dict:
+    """
+    Check if the question semantically requires real-world examples (fines)
+    even if not explicitly asked.
+    """
+    question = state["original_question"]
+    context = state["retrieved_context"]
+    
+    # If question is about "handling situations" and context has no real examples
+    needs_examples = any(kw in question.lower() for kw in 
+                        ["handle", "approach", "deal with", "respond to"])
+    has_examples = "SOURCE: Enforcement" in context
+    
+    if needs_examples and not has_examples:
+        return {"needs_example_expansion": True}
+    
+    return {"needs_example_expansion": False}
 
 # ============================================================================
 # EXPAND RETRIEVAL NODE (All Sources)

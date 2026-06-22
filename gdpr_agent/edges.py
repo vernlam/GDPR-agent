@@ -43,6 +43,29 @@ def edge_verify_output(state: AgentState) -> str:
     else:
         print("⚠️  Groundedness failed - regenerating with stricter prompt")
         return "regenerate_strict"
+    
+def edge_route_after_source_check(state: AgentState) -> str:
+    """
+    Route based on whether the question needs real-world examples (fines).
+    """
+    needs_expansion = state.get("needs_example_expansion", False)
+    expanded_used = state.get("expanded_search_used", False)
+    
+    print(f"🔀 [Edge: Route Source Check] needs_expansion={needs_expansion}, expanded={expanded_used}")
+    
+    # Prevent infinite loops - only expand once
+    if expanded_used:
+        print("   → Already expanded, proceeding to completeness check")
+        return "check_completeness"
+    
+    # If needs examples and haven't expanded yet
+    if needs_expansion:
+        print("   → Expanding to include fines/examples")
+        return "expand_all_sources"
+    
+    # Otherwise proceed normally
+    print("   → Source coverage adequate, proceeding to completeness check")
+    return "check_completeness"
 
 def edge_route_after_completeness(state: AgentState) -> str:
     """

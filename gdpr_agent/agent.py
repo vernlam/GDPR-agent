@@ -53,7 +53,10 @@ class GDPRAgent:
                 "retrieved_context": "",
                 "generated_answer": "",
                 "retrieval_loop_count": 0,
-                "generation_loop_count": 0
+                "generation_loop_count": 0,
+                "is_answer_complete": True,
+                "expanded_search_used": False,
+                "needs_example_expansion": False
             }
         else:
             # Use provided state directly
