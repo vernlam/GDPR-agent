@@ -5,8 +5,71 @@ Each successful eval creates a new version.
 
 import mlflow
 import argparse
+import sys
+import os
 from datetime import datetime
-from gdpr_agent import GDPRAgent
+import pandas as pd
+
+
+class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
+    """MLflow wrapper for GDPRAgent"""
+    
+    def __init__(self):
+        """Initialize without creating agent yet (happens in load_context)"""
+        self.agent = None
+    
+    def load_context(self, context):
+        """Called when model is loaded for serving"""
+        # Import here to avoid issues during serialization
+        from gdpr_agent.agent import GDPRAgent
+        self.agent = GDPRAgent()
+    
+    def predict(self, context, model_input):
+        """
+        Handle inference requests.
+        
+        Expected input:
+        - pandas DataFrame with 'question' column
+        - dict with 'question' key
+        - list of dicts with 'question' key
+        """
+        import pandas as pd
+        
+        # Ensure agent is loaded
+        if self.agent is None:
+            from gdpr_agent.agent import GDPRAgent
+            self.agent = GDPRAgent()
+        
+        # Handle different input types
+        if isinstance(model_input, pd.DataFrame):
+            questions = model_input['question'].tolist()
+        elif isinstance(model_input, dict):
+            questions = [model_input.get('question', '')]
+        elif isinstance(model_input, list):
+            questions = [q.get('question', '') if isinstance(q, dict) else str(q) for q in model_input]
+        else:
+            questions = [str(model_input)]
+        
+        # Process each question
+        results = []
+        for question in questions:
+            try:
+                # Call your agent's query method
+                response = self.agent.query(question)
+                results.append({
+                    'answer': response.get('answer', ''),
+                    'context': response.get('context', []),
+                    'sources': response.get('sources', [])
+                })
+            except Exception as e:
+                results.append({
+                    'answer': f"Error: {str(e)}",
+                    'context': [],
+                    'sources': []
+                })
+        
+        return results
+
 
 def register_staging_model(commit_sha: str, pass_rate: float):
     """
@@ -19,6 +82,9 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     Returns:
         Model version number
     """
+    
+    # Ensure we're importing from the correct location
+    sys.path.insert(0, '/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent')
     
     # Use staging experiment
     mlflow.set_experiment("/Shared/gdpr-agent-staging")
@@ -37,28 +103,60 @@ def register_staging_model(commit_sha: str, pass_rate: float):
             "eval_pass_rate": pass_rate,
         })
         
-        # Register model
+        # Define input/output signature (required for Unity Catalog)
+        input_example = pd.DataFrame({
+            "question": ["What are the GDPR requirements for data deletion?"]
+        })
+        
+        output_example = [{
+            "answer": "Under GDPR Article 17, individuals have the right to erasure...",
+            "context": ["Article 17: Right to erasure"],
+            "sources": ["legislation"]
+        }]
+        
+        signature = mlflow.models.infer_signature(
+            model_input=input_example,
+            model_output=output_example
+        )
+        
+        # Register model using the wrapper
         model_info = mlflow.pyfunc.log_model(
             artifact_path="model",
-            python_model=GDPRAgent(),
-            registered_model_name="gdpr_agent_staging",  # Separate staging registry
+            python_model=GDPRAgentWrapper(),
+            registered_model_name="main.default.gdpr_agent_staging",
+            signature=signature,  # ← Added signature
+            input_example=input_example,  # ← Added input example
             pip_requirements=[
                 "openai>=1.12.0",
-                "langgraph>=0.0.20",
+                "langgraph>=0.2.0",
                 "databricks-vectorsearch",
-                "mlflow"
+                "mlflow",
+                "pandas"
             ]
         )
         
         # Get the version that was just registered
+        # Unity Catalog only supports simple name filters (not run_id)
         client = mlflow.tracking.MlflowClient()
-        model_version = client.search_model_versions(
-            filter_string=f"name='gdpr_agent_staging' and run_id='{run.info.run_id}'"
-        )[0].version
+        
+        # Search by name only (Unity Catalog limitation)
+        all_versions = client.search_model_versions(
+            filter_string=f"name='main.default.gdpr_agent_staging'"
+        )
+        
+        # Find the version matching our run_id
+        model_version = None
+        for v in all_versions:
+            if v.run_id == run.info.run_id:
+                model_version = v.version
+                break
+        
+        if model_version is None:
+            raise Exception(f"Could not find registered model version for run_id: {run.info.run_id}")
         
         # Add tags to the model version
         client.set_model_version_tag(
-            name="gdpr_agent_staging",
+            name="main.default.gdpr_agent_staging",
             version=model_version,
             key="commit_sha",
             value=commit_sha
