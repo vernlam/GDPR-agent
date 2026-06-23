@@ -1,0 +1,60 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to deploy'
+        required: true
+      pass_rate:
+        description: 'Evaluation pass rate'
+        required: true
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install databricks-sdk mlflow openai langgraph
+      
+      - name: Register Model to Staging
+        id: register
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          VERSION=$(python deploy/register_staging.py \
+            --commit-sha ${{ inputs.commit_sha }} \
+            --pass-rate ${{ inputs.pass_rate }})
+          
+          echo "model_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Registered model version: $VERSION"
+      
+      - name: Deploy to Staging Endpoint
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          python deploy/deploy_endpoint.py \
+            --endpoint-name gdpr-agent-staging \
+            --model-name gdpr_agent_staging \
+            --model-version ${{ steps.register.outputs.model_version }}
+      
+      - name: Summary
+        run: |
+          echo "## 🚀 Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ inputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Pass Rate: ${{ inputs.pass_rate }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Model Version: ${{ steps.register.outputs.model_version }}" >> $GITHUB_STEP_SUMMARY

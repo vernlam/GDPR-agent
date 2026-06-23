@@ -1,0 +1,83 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_version:
+        description: 'Staging model version to promote (e.g., 5)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.get_metadata.outputs.commit_sha }}
+      pass_rate: ${{ steps.get_metadata.outputs.pass_rate }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get Model Metadata
+        id: get_metadata
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          # Fetch model version metadata
+          METADATA=$(python deploy/get_model_metadata.py \
+            --model-name gdpr_agent_staging \
+            --version ${{ inputs.staging_version }})
+          
+          echo "commit_sha=$(echo $METADATA | jq -r '.commit_sha')" >> $GITHUB_OUTPUT
+          echo "pass_rate=$(echo $METADATA | jq -r '.pass_rate')" >> $GITHUB_OUTPUT
+      
+      - name: Display Model Info
+        run: |
+          echo "## 📦 Model to Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Staging Version**: ${{ inputs.staging_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ steps.get_metadata.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pass Rate**: ${{ steps.get_metadata.outputs.pass_rate }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: production  # Requires approval in GitHub Settings
+      url: https://<workspace>/serving-endpoints/gdpr-agent-prod
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Promote to Production Registry
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          PROD_VERSION=$(python deploy/promote_to_production.py \
+            --staging-version ${{ inputs.staging_version }})
+          
+          echo "prod_version=$PROD_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Deploy to Production Endpoint
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          python deploy/deploy_endpoint.py \
+            --endpoint-name gdpr-agent-prod \
+            --model-name gdpr_agent_prod \
+            --model-version $PROD_VERSION
+      
+      - name: Run Smoke Tests
+        run: |
+          python deploy/smoke_tests.py --endpoint gdpr-agent-prod
+      
+      - name: Success Notification
+        run: |
+          echo "## ✅ Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Staging Version**: ${{ inputs.staging_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production Version**: $PROD_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

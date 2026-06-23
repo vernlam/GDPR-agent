@@ -12,10 +12,13 @@ on:
       - 'gdpr_agent/**'
       - 'evaluation_data/**'
   workflow_dispatch:
+
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      pass_rate: ${{ steps.get_pass_rate.outputs.pass_rate }}
     
     steps:
     - name: Checkout code
@@ -47,6 +50,18 @@ jobs:
           --output evaluation_results.csv \
           --report evaluation_report.txt
     
+    - name: Extract Pass Rate
+      id: get_pass_rate
+      if: always()
+      run: |
+        if [ -f evaluation_results.csv ]; then
+          PASS_RATE=$(python -c "import pandas as pd; df = pd.read_csv('evaluation_results.csv'); print(df['passed'].mean())" 2>/dev/null || echo "0")
+          echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+          echo "Pass rate: $PASS_RATE"
+        else
+          echo "pass_rate=0" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Upload Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -70,3 +85,25 @@ jobs:
             repo: context.repo.repo,
             body: `## 📊 GDPR Agent Evaluation Results\n\n\`\`\`\n${report}\n\`\`\``
           });
+
+  trigger-staging:
+    needs: evaluate
+    if: github.ref == 'refs/heads/main' && success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Staging Deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'staging-deploy.yml',
+              ref: 'main',
+              inputs: {
+                commit_sha: '${{ github.sha }}',
+                pass_rate: '${{ needs.evaluate.outputs.pass_rate }}'
+              }
+            });
+            console.log('✅ Triggered staging deployment workflow');
