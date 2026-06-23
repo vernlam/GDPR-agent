@@ -177,9 +177,9 @@ def register_staging_model(commit_sha: str, pass_rate: float):
             value="staging"
         )
         
-        print(f"✅ Registered staging model version: {model_version}")
-        print(f"📊 Pass rate: {pass_rate}")
-        print(f"🔗 MLflow Run: {run.info.run_id}")
+        print(f"✅ Registered staging model version: {model_version}", file=sys.stderr)
+        print(f"📊 Pass rate: {pass_rate}", file=sys.stderr)
+        print(f"🔗 MLflow Run: {run.info.run_id}", file=sys.stderr)
         
         return model_version
 
