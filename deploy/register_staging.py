@@ -82,7 +82,13 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     Returns:
         Model version number
     """
-    
+    import logging
+    import warnings
+
+    # Suppress MLflow verbose output to stdout
+    logging.getLogger("mlflow").setLevel(logging.ERROR)
+    warnings.filterwarnings("ignore")
+
     # Ensure we're importing from the correct location
     if '/Workspace/' in os.getcwd():
         sys.path.insert(0, '/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent')
