@@ -25,7 +25,7 @@ def grade_retrieved_context(user_question: str, retrieved_context: str) -> bool:
         
     print("🧐 Grading retrieved context relevance...")
     
-    prompt = f"""You are a quality control auditor. Evaluate if the provided retrieved context contains background information, direct evidence, or context that is relevant to answering the user's question.
+    prompt = f"""You are an expert quality control auditor. Evaluate if the provided retrieved context contains background information, direct evidence, or context that is relevant to answering the user's question.
 
     Retrieved Context:
     {retrieved_context}
