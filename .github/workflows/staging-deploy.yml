@@ -34,6 +34,7 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MLFLOW_TRACKING_URI: databricks
         run: |
           VERSION=$(python deploy/register_staging.py \
             --commit-sha ${{ inputs.commit_sha }} \
