@@ -49,7 +49,7 @@ jobs:
         run: |
           python deploy/deploy_endpoint.py \
             --endpoint-name gdpr-agent-staging \
-            --model-name gdpr_agent_staging \
+            --model-name main.default.gdpr_agent_staging \
             --model-version ${{ steps.register.outputs.model_version }}
       
       - name: Summary

@@ -84,7 +84,8 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     """
     
     # Ensure we're importing from the correct location
-    sys.path.insert(0, '/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent')
+    if '/Workspace/' in os.getcwd():
+        sys.path.insert(0, '/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent')
     
     # Use staging experiment
     mlflow.set_experiment("/Shared/gdpr-agent-staging")
@@ -163,14 +164,14 @@ def register_staging_model(commit_sha: str, pass_rate: float):
         )
         
         client.set_model_version_tag(
-            name="gdpr_agent_staging",
+            name="main.default.gdpr_agent_staging",
             version=model_version,
             key="eval_pass_rate",
             value=str(pass_rate)
         )
         
         client.set_model_version_tag(
-            name="gdpr_agent_staging",
+            name="main.default.gdpr_agent_staging",
             version=model_version,
             key="deployment_status",
             value="staging"
