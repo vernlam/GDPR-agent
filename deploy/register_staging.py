@@ -94,42 +94,49 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     if '/Workspace/' in os.getcwd():
         sys.path.insert(0, '/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent')
     
-    # Use staging experiment
-    mlflow.set_experiment("/Shared/gdpr-agent-staging")
-    
-    with mlflow.start_run(run_name=f"staging_{commit_sha[:7]}") as run:
-        
-        # Log evaluation metrics
-        mlflow.log_params({
-            "commit_sha": commit_sha,
-            "llm_model": "gpt-4o-mini",
-            "deployment_target": "staging",
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        mlflow.log_metrics({
-            "eval_pass_rate": pass_rate,
-        })
-        
-        # Define input/output signature (required for Unity Catalog)
-        input_example = pd.DataFrame({
-            "question": ["What are the GDPR requirements for data deletion?"]
-        })
-        
-        output_example = [{
-            "answer": "Under GDPR Article 17, individuals have the right to erasure...",
-            "context": ["Article 17: Right to erasure"],
-            "sources": ["legislation"]
-        }]
-        
-        signature = mlflow.models.infer_signature(
-            model_input=input_example,
-            model_output=output_example
-        )
-        
-        # Register model using the wrapper (swallowing MLflow stdout logs)
-        with open(os.devnull, 'w') as devnull:
-            with redirect_stdout(devnull):
+    # Initialize tracking variables outside context
+    model_version = None
+    current_run_id = None
+
+    # Global stdout redirect block
+    with open(os.devnull, 'w') as devnull:
+        with redirect_stdout(devnull):
+            
+            # Use staging experiment
+            mlflow.set_experiment("/Shared/gdpr-agent-staging")
+            
+            with mlflow.start_run(run_name=f"staging_{commit_sha[:7]}") as run:
+                current_run_id = run.info.run_id
+                
+                # Log evaluation metrics
+                mlflow.log_params({
+                    "commit_sha": commit_sha,
+                    "llm_model": "gpt-4o-mini",
+                    "deployment_target": "staging",
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                mlflow.log_metrics({
+                    "eval_pass_rate": pass_rate,
+                })
+                
+                # Define input/output signature (required for Unity Catalog)
+                input_example = pd.DataFrame({
+                    "question": ["What are the GDPR requirements for data deletion?"]
+                })
+                
+                output_example = [{
+                    "answer": "Under GDPR Article 17, individuals have the right to erasure...",
+                    "context": ["Article 17: Right to erasure"],
+                    "sources": ["legislation"]
+                }]
+                
+                signature = mlflow.models.infer_signature(
+                    model_input=input_example,
+                    model_output=output_example
+                )
+                
+                # Register model using the wrapper
                 model_info = mlflow.pyfunc.log_model(
                     artifact_path="model",
                     python_model=GDPRAgentWrapper(),
@@ -144,53 +151,53 @@ def register_staging_model(commit_sha: str, pass_rate: float):
                         "pandas"
                     ]
                 )
-        
-        # Get the version that was just registered
-        # Unity Catalog only supports simple name filters (not run_id)
-        client = mlflow.tracking.MlflowClient()
-        
-        # Search by name only (Unity Catalog limitation)
-        all_versions = client.search_model_versions(
-            filter_string=f"name='main.default.gdpr_agent_staging'"
-        )
-        
-        # Find the version matching our run_id
-        model_version = None
-        for v in all_versions:
-            if v.run_id == run.info.run_id:
-                model_version = v.version
-                break
-        
-        if model_version is None:
-            raise Exception(f"Could not find registered model version for run_id: {run.info.run_id}")
-        
-        # Add tags to the model version
-        client.set_model_version_tag(
-            name="main.default.gdpr_agent_staging",
-            version=model_version,
-            key="commit_sha",
-            value=commit_sha
-        )
-        
-        client.set_model_version_tag(
-            name="main.default.gdpr_agent_staging",
-            version=model_version,
-            key="eval_pass_rate",
-            value=str(pass_rate)
-        )
-        
-        client.set_model_version_tag(
-            name="main.default.gdpr_agent_staging",
-            version=model_version,
-            key="deployment_status",
-            value="staging"
-        )
-        
-        print(f"✅ Registered staging model version: {model_version}", file=sys.stderr)
-        print(f"📊 Pass rate: {pass_rate}", file=sys.stderr)
-        print(f"🔗 MLflow Run: {run.info.run_id}", file=sys.stderr)
-        
-        return model_version
+                
+                # Get the version that was just registered
+                client = mlflow.tracking.MlflowClient()
+                
+                # Search by name only (Unity Catalog limitation)
+                all_versions = client.search_model_versions(
+                    filter_string=f"name='main.default.gdpr_agent_staging'"
+                )
+                
+                # Find the version matching our run_id
+                for v in all_versions:
+                    if v.run_id == current_run_id:
+                        model_version = v.version
+                        break
+                
+                if model_version is None:
+                    raise Exception(f"Could not find registered model version for run_id: {current_run_id}")
+                
+                # Add tags to the model version
+                client.set_model_version_tag(
+                    name="main.default.gdpr_agent_staging",
+                    version=model_version,
+                    key="commit_sha",
+                    value=commit_sha
+                )
+                
+                client.set_model_version_tag(
+                    name="main.default.gdpr_agent_staging",
+                    version=model_version,
+                    key="eval_pass_rate",
+                    value=str(pass_rate)
+                )
+                
+                client.set_model_version_tag(
+                    name="main.default.gdpr_agent_staging",
+                    version=model_version,
+                    key="deployment_status",
+                    value="staging"
+                )
+
+    # ---- OUTSIDE THE REDIRECT BLOCK ----
+    # Now standard stdout is restored, and we safely output summaries to stderr
+    print(f"✅ Registered staging model version: {model_version}", file=sys.stderr)
+    print(f"📊 Pass rate: {pass_rate}", file=sys.stderr)
+    print(f"🔗 MLflow Run: {current_run_id}", file=sys.stderr)
+    
+    return model_version
 
 
 if __name__ == "__main__":
@@ -201,4 +208,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     version = register_staging_model(args.commit_sha, args.pass_rate)
-    print(version)  # Output for GitHub Actions to capture
+    print(version)  # Pure integer output for GitHub Actions output parsing
