@@ -84,6 +84,7 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     """
     import logging
     import warnings
+    from contextlib import redirect_stdout
 
     # Suppress MLflow verbose output to stdout
     logging.getLogger("mlflow").setLevel(logging.ERROR)
@@ -126,21 +127,23 @@ def register_staging_model(commit_sha: str, pass_rate: float):
             model_output=output_example
         )
         
-        # Register model using the wrapper
-        model_info = mlflow.pyfunc.log_model(
-            artifact_path="model",
-            python_model=GDPRAgentWrapper(),
-            registered_model_name="main.default.gdpr_agent_staging",
-            signature=signature,  # ← Added signature
-            input_example=input_example,  # ← Added input example
-            pip_requirements=[
-                "openai>=1.12.0",
-                "langgraph>=0.2.0",
-                "databricks-vectorsearch",
-                "mlflow",
-                "pandas"
-            ]
-        )
+        # Register model using the wrapper (swallowing MLflow stdout logs)
+        with open(os.devnull, 'w') as devnull:
+            with redirect_stdout(devnull):
+                model_info = mlflow.pyfunc.log_model(
+                    artifact_path="model",
+                    python_model=GDPRAgentWrapper(),
+                    registered_model_name="main.default.gdpr_agent_staging",
+                    signature=signature,
+                    input_example=input_example,
+                    pip_requirements=[
+                        "openai>=1.12.0",
+                        "langgraph>=0.2.0",
+                        "databricks-vectorsearch",
+                        "mlflow",
+                        "pandas"
+                    ]
+                )
         
         # Get the version that was just registered
         # Unity Catalog only supports simple name filters (not run_id)
