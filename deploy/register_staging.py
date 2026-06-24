@@ -137,6 +137,18 @@ def register_staging_model(commit_sha: str, pass_rate: float):
                 # Running in GitHub Actions
                 code_paths = ["./gdpr_agent"]
             
+            resources = [
+            DatabricksVectorSearchIndex(
+                index_name="main.default.gdpr_law_vector_index"
+            ),
+            DatabricksVectorSearchIndex(
+                index_name="main.default.gdpr_fines_vector_index"
+            ),
+            DatabricksVectorSearchIndex(
+                index_name="main.default.privacy_policy_vector_index"
+            )
+            ]
+
             # Register model using the wrapper WITH code paths
             model_info = mlflow.pyfunc.log_model(
                 artifact_path="model",
@@ -151,7 +163,8 @@ def register_staging_model(commit_sha: str, pass_rate: float):
                     "databricks-vectorsearch",
                     "mlflow",
                     "pandas"
-                ]
+                ],
+                resources=resources
             )
             
             # Get the version that was just registered
