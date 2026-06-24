@@ -26,7 +26,9 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install databricks-sdk mlflow openai langgraph
+          python -m pip install --upgrade pip
+          pip install --upgrade databricks-sdk  # 👈 Upgraded to unblock the new AI Gateway tracking schemas
+          pip install mlflow openai langgraph pandas
       
       - name: Register Model to Staging
         id: register
@@ -36,11 +38,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MLFLOW_TRACKING_URI: databricks
         run: |
-          VERSION=$(python deploy/register_staging.py \
+          # Capture the pure integer version output from the script
+          VERSION=$(python register_staging.py \
             --commit-sha ${{ inputs.commit_sha }} \
             --pass-rate ${{ inputs.pass_rate }})
           
-          echo "model_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "model_version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "✅ Registered model version: $VERSION"
       
       - name: Deploy to Staging Endpoint
@@ -51,11 +54,13 @@ jobs:
           python deploy/deploy_endpoint.py \
             --endpoint-name gdpr-agent-staging \
             --model-name main.default.gdpr_agent_staging \
-            --model-version ${{ steps.register.outputs.model_version }}
+            --model-version ${{ steps.register.outputs.model_version }} \
+            --workload-size "Small" \
+            --scale-to-zero true
       
       - name: Summary
         run: |
           echo "## 🚀 Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: ${{ inputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Pass Rate: ${{ inputs.pass_rate }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Model Version: ${{ steps.register.outputs.model_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ inputs.commit_sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pass Rate:** ${{ inputs.pass_rate }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Model Version:** ${{ steps.register.outputs.model_version }}" >> $GITHUB_STEP_SUMMARY
