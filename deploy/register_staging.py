@@ -143,6 +143,11 @@ def register_staging_model(commit_sha: str, pass_rate: float):
                     registered_model_name="main.default.gdpr_agent_staging",
                     signature=signature,
                     input_example=input_example,
+                    code_paths=[
+                        "/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent/gdpr_agent"
+                        if os.path.exists("/Workspace/Repos/vernonc.lam@gmail.com/GDPR-agent/gdpr_agent")
+                        else "./gdpr_agent"
+                    ]
                     pip_requirements=[
                         "openai>=1.12.0",
                         "langgraph>=0.2.0",
