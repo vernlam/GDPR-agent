@@ -113,9 +113,11 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
         try:
             endpoint = client.serving_endpoints.get(endpoint_name)
             
-            # Safely parse out string state
+            # 🟢 FIXED: Safe object verification extraction
             if endpoint.state and endpoint.state.config_update:
-                state = str(endpoint.state.config_update.state)
+                state = str(endpoint.state.config_update.status)
+            elif endpoint.state and endpoint.state.ready:
+                state = str(endpoint.state.ready)
             else:
                 state = "READY"
             
@@ -125,12 +127,12 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
                 print(f"   Status: {state} ({elapsed}s elapsed)", file=sys.stderr)
                 last_state = state
             
-            # Check if ready
-            if state in ["NOT_UPDATING", "READY"]:
+            # 🟢 FIXED: Case-insensitive substring verification avoids Enum errors
+            if any(x in state.upper() for x in ["NOT_UPDATING", "READY", "READY_STATE"]):
                 print(f"✅ Endpoint is ready!", file=sys.stderr)
                 return endpoint
-            elif state == "UPDATE_FAILED":
-                raise Exception(f"❌ Endpoint update failed!")
+            elif "FAILED" in state.upper():
+                raise Exception(f"❌ Endpoint update failed! Current State: {state}")
             
         except Exception as e:
             if "does not exist" in str(e).lower():
