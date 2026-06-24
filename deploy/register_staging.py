@@ -55,11 +55,10 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
         for question in questions:
             try:
                 # Call your agent's query method
-                response = self.agent.query(question)
+                response = self.agent.invoke({"question": question})
                 results.append({
                     'answer': response.get('answer', ''),
                     'context': response.get('context', []),
-                    'sources': response.get('sources', [])
                 })
             except Exception as e:
                 results.append({
