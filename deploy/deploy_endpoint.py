@@ -20,7 +20,8 @@ def deploy_endpoint(
     model_name: str,
     model_version: str,
     workload_size: str = "Small",
-    scale_to_zero: bool = True
+    scale_to_zero: bool = True,
+    timeout: int = 3600
 ):
     """
     Deploy or update a model serving endpoint.
@@ -70,10 +71,12 @@ def deploy_endpoint(
         existing = w.serving_endpoints.get(endpoint_name)
         print(f"📝 Endpoint '{endpoint_name}' exists. Verifying deployment state...", file=sys.stderr)
         
-        # 🟢 FIXED: Clean, crash-proof check for an active configuration update lock
+        # Check for active configuration update lock
         if existing.state and existing.state.config_update:
-            print(f"⏳ Backend has an active config update in progress. Waiting for lock to clear...", file=sys.stderr)
-            wait_for_endpoint(w, endpoint_name)
+            config_status = str(existing.state.config_update).upper()
+            if "IN_PROGRESS" in config_status or "UPDATE" in config_status:
+                print(f"⏳ Backend has an active config update in progress. Waiting for lock to clear...", file=sys.stderr)
+                wait_for_endpoint(w, endpoint_name, timeout=timeout)
         
         # Update existing endpoint configuration smoothly
         try:
@@ -83,10 +86,10 @@ def deploy_endpoint(
                 traffic_config=endpoint_config.traffic_config
             )
         except Exception as update_err:
-            # 🟢 EXCEPTION BACKOFF: Fallback catch if the status block hadn't propagated the lock yet
+            # Fallback catch if the status block hadn't propagated the lock yet
             if "RESOURCE_CONFLICT" in str(update_err).upper() or "BEING_UPDATED" in str(update_err).replace(" ", "_").upper():
                 print(f"⏳ Hit conflict warning. Waiting out the active backend deployment track...", file=sys.stderr)
-                wait_for_endpoint(w, endpoint_name)
+                wait_for_endpoint(w, endpoint_name, timeout=timeout)
                 # Re-try modification step once lock releases
                 w.serving_endpoints.update_config(
                     name=endpoint_name,
@@ -108,13 +111,13 @@ def deploy_endpoint(
                 config=endpoint_config
             )
             
-            print(f"⏳ Creating endpoint (10-15 minutes)...", file=sys.stderr)
+            print(f"⏳ Creating endpoint (10-15 minutes for first deployment, may take up to 45 minutes with dependencies)...", file=sys.stderr)
         else:
             print(f"❌ Error: {e}", file=sys.stderr)
             raise e
     
     # Wait for endpoint to reach operational status
-    wait_for_endpoint(w, endpoint_name)
+    wait_for_endpoint(w, endpoint_name, timeout=timeout)
     
     print(f"\n✅ Deployment complete!", file=sys.stderr)
     print(f"🔗 Endpoint URL: https://{w.config.host}/serving-endpoints/{endpoint_name}", file=sys.stderr)
@@ -122,9 +125,10 @@ def deploy_endpoint(
     return endpoint_name
 
 
-def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int = 1800):
+def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int = 3600):
     """
     Wait for endpoint to reach READY state.
+    Default timeout is 60 minutes for initial deployments with dependencies.
     """
     start_time = time.time()
     last_state = None
@@ -133,13 +137,31 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
         try:
             endpoint = client.serving_endpoints.get(endpoint_name)
             
-            # Safe object verification extraction
+            # Extract state from endpoint object
+            state = "UNKNOWN"
             if endpoint.state:
-                if endpoint.state.config_update:
-                    state = "IN_PROGRESS"
-                elif endpoint.state.ready:
-                    state = str(endpoint.state.ready).upper()
+                # Check config_update status first
+                if hasattr(endpoint.state, 'config_update') and endpoint.state.config_update:
+                    config_status = str(endpoint.state.config_update).upper()
+                    if "NOT_UPDATING" in config_status:
+                        state = "READY"
+                    elif "IN_PROGRESS" in config_status or "UPDATE" in config_status:
+                        state = "IN_PROGRESS"
+                    elif "FAILED" in config_status:
+                        state = "FAILED"
+                    else:
+                        state = config_status
+                # Check ready status
+                elif hasattr(endpoint.state, 'ready') and endpoint.state.ready:
+                    ready_status = str(endpoint.state.ready).upper()
+                    if "READY" in ready_status:
+                        state = "READY"
+                    elif "NOT_READY" in ready_status:
+                        state = "NOT_READY"
+                    else:
+                        state = ready_status
                 else:
+                    # Default to READY if no update in progress and endpoint exists
                     state = "READY"
             else:
                 state = "READY"
@@ -147,19 +169,21 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
             # Only print if state changed
             if state != last_state:
                 elapsed = int(time.time() - start_time)
-                print(f"   Status: {state} ({elapsed}s elapsed)", file=sys.stderr)
+                minutes = elapsed // 60
+                seconds = elapsed % 60
+                print(f"   Status: {state} ({minutes}m {seconds}s elapsed)", file=sys.stderr)
                 last_state = state
             
-            # Case-insensitive substring verification avoids Enum errors
-            if any(x in state.upper() for x in ["NOT_UPDATING", "READY", "READY_STATE"]):
+            # Check if ready (case-insensitive)
+            if state == "READY" or "NOT_UPDATING" in state:
                 print(f"✅ Endpoint is ready!", file=sys.stderr)
                 return endpoint
-            elif "FAILED" in state.upper():
-                raise Exception(f"❌ Endpoint update failed! Current State: {state}")
+            elif "FAIL" in state:
+                raise Exception(f"❌ Endpoint deployment failed! Current State: {state}")
             
         except Exception as e:
             if "does not exist" in str(e).lower():
-                if time.time() - start_time < 60:
+                if time.time() - start_time < 120:
                     print(f"   Waiting for endpoint to be created...", file=sys.stderr)
                 else:
                     raise e
@@ -168,7 +192,8 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
         
         time.sleep(30)
     
-    raise TimeoutError(f"❌ Endpoint did not become ready within {timeout}s")
+    minutes = timeout // 60
+    raise TimeoutError(f"❌ Endpoint did not become ready within {timeout}s ({minutes} minutes)")
 
 
 if __name__ == "__main__":
@@ -177,9 +202,8 @@ if __name__ == "__main__":
     parser.add_argument("--model-name", required=True)
     parser.add_argument("--model-version", required=True)
     parser.add_argument("--workload-size", default="Small", choices=["Small", "Medium", "Large"])
-    
-    # Clean boolean helper text conversion
     parser.add_argument("--scale-to-zero", type=lambda x: (str(x).lower() in ['true', '1', 'yes']), default=True)
+    parser.add_argument("--timeout", type=int, default=3600, help="Timeout in seconds (default: 3600 = 60 minutes)")
     
     args = parser.parse_args()
     
@@ -188,7 +212,8 @@ if __name__ == "__main__":
         model_name=args.model_name,
         model_version=args.model_version,
         workload_size=args.workload_size,
-        scale_to_zero=args.scale_to_zero
+        scale_to_zero=args.scale_to_zero,
+        timeout=args.timeout
     )
     
     print(endpoint_name)  # Clean standard stdout print for GitHub variables
