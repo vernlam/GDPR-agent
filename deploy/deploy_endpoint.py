@@ -1,6 +1,6 @@
 """
 Deploy model to Databricks Model Serving endpoint.
-Supports both Staging and Production workloads.
+Supports both Staging and Production workloads with modern AI Gateway Inference Tables.
 """
 
 import argparse
@@ -10,9 +10,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedEntityInput,
-    AutoCaptureConfigInput,
     TrafficConfig,
-    Route
+    Route,
+    AiGatewayConfig,
+    GatewayInferenceTableConfig
 )
 
 
@@ -24,7 +25,7 @@ def deploy_endpoint(
     scale_to_zero: bool = True
 ):
     """
-    Deploy or update a model serving endpoint.
+    Deploy or update a model serving endpoint with AI Gateway tracking enabled.
     """
     w = WorkspaceClient()
     
@@ -48,12 +49,14 @@ def deploy_endpoint(
         )
     ]
     
-    # Configure auto-capture (inference logging)
-    auto_capture_config = AutoCaptureConfigInput(
-        catalog_name="main",
-        schema_name="default",
-        table_name_prefix=f"{endpoint_name.replace('-', '_')}_logs",
-        enabled=True
+    # Configure the new AI Gateway Inference Table tracking mechanism
+    ai_gateway_config = AiGatewayConfig(
+        inference_table_config=GatewayInferenceTableConfig(
+            catalog_name="main",
+            schema_name="default",
+            table_name_prefix=f"{endpoint_name.replace('-', '_')}_logs",
+            enabled=True
+        )
     )
     
     # Build traffic config
@@ -66,11 +69,11 @@ def deploy_endpoint(
         ]
     )
     
-    # Build endpoint configuration
+    # Build endpoint configuration using ai_gateway instead of auto_capture_config
     endpoint_config = EndpointCoreConfigInput(
         name=endpoint_name,
         served_entities=served_entities,
-        auto_capture_config=auto_capture_config,
+        ai_gateway=ai_gateway_config,
         traffic_config=traffic_config
     )
     
@@ -79,11 +82,11 @@ def deploy_endpoint(
         existing = w.serving_endpoints.get(endpoint_name)
         print(f"📝 Endpoint '{endpoint_name}' exists. Updating configuration...", file=sys.stderr)
         
-        # Update existing endpoint
+        # Update existing endpoint using the modern payload options
         w.serving_endpoints.update_config(
             name=endpoint_name,
             served_entities=endpoint_config.served_entities,
-            auto_capture_config=endpoint_config.auto_capture_config,
+            ai_gateway=endpoint_config.ai_gateway,
             traffic_config=endpoint_config.traffic_config
         )
         
@@ -107,12 +110,9 @@ def deploy_endpoint(
     # Wait for endpoint to be ready
     wait_for_endpoint(w, endpoint_name)
     
-    # Get endpoint details
-    endpoint = w.serving_endpoints.get(endpoint_name)
-    
     print(f"\n✅ Deployment complete!", file=sys.stderr)
     print(f"🔗 Endpoint URL: https://{w.config.host}/serving-endpoints/{endpoint_name}", file=sys.stderr)
-    print(f"📈 Monitoring logs: main.default.{endpoint_name.replace('-', '_')}_logs_*", file=sys.stderr)
+    print(f"📈 AI Gateway Tables: main.default.{endpoint_name.replace('-', '_')}_logs_*", file=sys.stderr)
     
     return endpoint_name
 
