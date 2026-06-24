@@ -70,12 +70,10 @@ def deploy_endpoint(
         existing = w.serving_endpoints.get(endpoint_name)
         print(f"📝 Endpoint '{endpoint_name}' exists. Verifying deployment state...", file=sys.stderr)
         
-        # 🟢 PRE-CHECK BACKOFF: If an update is actively processing, wait out the lock first
+        # 🟢 FIXED: Clean, crash-proof check for an active configuration update lock
         if existing.state and existing.state.config_update:
-            current_status = str(existing.state.config_update.status).upper()
-            if any(status in current_status for status in ["IN_PROGRESS", "PENDING"]):
-                print(f"⏳ Backend is currently busy ({current_status}). Waiting for lock to clear...", file=sys.stderr)
-                wait_for_endpoint(w, endpoint_name)
+            print(f"⏳ Backend has an active config update in progress. Waiting for lock to clear...", file=sys.stderr)
+            wait_for_endpoint(w, endpoint_name)
         
         # Update existing endpoint configuration smoothly
         try:
@@ -136,10 +134,13 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
             endpoint = client.serving_endpoints.get(endpoint_name)
             
             # Safe object verification extraction
-            if endpoint.state and endpoint.state.config_update:
-                state = str(endpoint.state.config_update.status)
-            elif endpoint.state and endpoint.state.ready:
-                state = str(endpoint.state.ready)
+            if endpoint.state:
+                if endpoint.state.config_update:
+                    state = "IN_PROGRESS"
+                elif endpoint.state.ready:
+                    state = str(endpoint.state.ready).upper()
+                else:
+                    state = "READY"
             else:
                 state = "READY"
             
