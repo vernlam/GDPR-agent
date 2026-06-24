@@ -84,6 +84,8 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     """
     import logging
     import warnings
+    import contextlib
+    import io
 
     # Suppress MLflow verbose output to stdout
     logging.getLogger("mlflow").setLevel(logging.ERROR)
