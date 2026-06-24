@@ -82,6 +82,8 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     Returns:
         Model version number
     """
+    import mlflow
+    from mlflow.models.resources import DatabricksVectorSearchIndex
     import logging
     import warnings
     import contextlib
