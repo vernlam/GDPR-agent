@@ -24,6 +24,7 @@ def deploy_endpoint(
 ):
     """
     Deploy or update a model serving endpoint.
+    Handles active updates gracefully by waiting for locks to clear.
     """
     w = WorkspaceClient()
     
@@ -67,14 +68,35 @@ def deploy_endpoint(
     try:
         # Try to get existing endpoint
         existing = w.serving_endpoints.get(endpoint_name)
-        print(f"📝 Endpoint '{endpoint_name}' exists. Updating configuration...", file=sys.stderr)
+        print(f"📝 Endpoint '{endpoint_name}' exists. Verifying deployment state...", file=sys.stderr)
+        
+        # 🟢 PRE-CHECK BACKOFF: If an update is actively processing, wait out the lock first
+        if existing.state and existing.state.config_update:
+            current_status = str(existing.state.config_update.status).upper()
+            if any(status in current_status for status in ["IN_PROGRESS", "PENDING"]):
+                print(f"⏳ Backend is currently busy ({current_status}). Waiting for lock to clear...", file=sys.stderr)
+                wait_for_endpoint(w, endpoint_name)
         
         # Update existing endpoint configuration smoothly
-        w.serving_endpoints.update_config(
-            name=endpoint_name,
-            served_entities=endpoint_config.served_entities,
-            traffic_config=endpoint_config.traffic_config
-        )
+        try:
+            w.serving_endpoints.update_config(
+                name=endpoint_name,
+                served_entities=endpoint_config.served_entities,
+                traffic_config=endpoint_config.traffic_config
+            )
+        except Exception as update_err:
+            # 🟢 EXCEPTION BACKOFF: Fallback catch if the status block hadn't propagated the lock yet
+            if "RESOURCE_CONFLICT" in str(update_err).upper() or "BEING_UPDATED" in str(update_err).replace(" ", "_").upper():
+                print(f"⏳ Hit conflict warning. Waiting out the active backend deployment track...", file=sys.stderr)
+                wait_for_endpoint(w, endpoint_name)
+                # Re-try modification step once lock releases
+                w.serving_endpoints.update_config(
+                    name=endpoint_name,
+                    served_entities=endpoint_config.served_entities,
+                    traffic_config=endpoint_config.traffic_config
+                )
+            else:
+                raise update_err
         
         print(f"⏳ Updating endpoint (5-10 minutes)...", file=sys.stderr)
         
@@ -113,7 +135,7 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
         try:
             endpoint = client.serving_endpoints.get(endpoint_name)
             
-            # 🟢 FIXED: Safe object verification extraction
+            # Safe object verification extraction
             if endpoint.state and endpoint.state.config_update:
                 state = str(endpoint.state.config_update.status)
             elif endpoint.state and endpoint.state.ready:
@@ -127,7 +149,7 @@ def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int 
                 print(f"   Status: {state} ({elapsed}s elapsed)", file=sys.stderr)
                 last_state = state
             
-            # 🟢 FIXED: Case-insensitive substring verification avoids Enum errors
+            # Case-insensitive substring verification avoids Enum errors
             if any(x in state.upper() for x in ["NOT_UPDATING", "READY", "READY_STATE"]):
                 print(f"✅ Endpoint is ready!", file=sys.stderr)
                 return endpoint
