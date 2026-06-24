@@ -98,7 +98,7 @@ def register_staging_model(commit_sha: str, pass_rate: float):
     # Use staging experiment
     mlflow.set_experiment("/Shared/gdpr-agent-staging")
     
-    with contextlib.redirect_stdout(io.stringIO()):
+    with contextlib.redirect_stdout(io.StringIO()):
         with mlflow.start_run(run_name=f"staging_{commit_sha[:7]}") as run:
             
             # Log evaluation metrics
