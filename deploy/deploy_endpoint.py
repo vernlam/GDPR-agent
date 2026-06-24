@@ -73,7 +73,6 @@ def deploy_endpoint(
     endpoint_config = EndpointCoreConfigInput(
         name=endpoint_name,
         served_entities=served_entities,
-        ai_gateway=ai_gateway_config,
         traffic_config=traffic_config
     )
     
@@ -86,7 +85,7 @@ def deploy_endpoint(
         w.serving_endpoints.update_config(
             name=endpoint_name,
             served_entities=endpoint_config.served_entities,
-            ai_gateway=endpoint_config.ai_gateway,
+            ai_gateway=ai_gateway_config,
             traffic_config=endpoint_config.traffic_config
         )
         
@@ -99,7 +98,8 @@ def deploy_endpoint(
             # Create new endpoint
             w.serving_endpoints.create(
                 name=endpoint_name,
-                config=endpoint_config
+                config=endpoint_config,
+                ai_gateway=ai_gateway_config
             )
             
             print(f"⏳ Creating endpoint (10-15 minutes)...", file=sys.stderr)
