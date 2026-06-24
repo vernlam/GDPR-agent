@@ -24,16 +24,13 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
         from gdpr_agent.agent import GDPRAgent
         self.agent = GDPRAgent()
     
-    def predict(self, context, model_input):
+    def predict(self, context, model_input):  # ← INDENTED (inside class)
         """
-        Handle inference requests.
-        
-        Expected input:
-        - pandas DataFrame with 'question' column
-        - dict with 'question' key
-        - list of dicts with 'question' key
+        Handle inference requests with logging.
         """
         import pandas as pd
+        from datetime import datetime
+        import uuid
         
         # Ensure agent is loaded
         if self.agent is None:
@@ -52,22 +49,79 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
         
         # Process each question
         results = []
+        logs = []
+        
         for question in questions:
+            request_id = str(uuid.uuid4())
+            start_time = datetime.now()
+            
             try:
-                # Call your agent's query method
+                # Call your agent's invoke method
                 response = self.agent.invoke({"question": question})
-                results.append({
+                
+                end_time = datetime.now()
+                latency_ms = (end_time - start_time).total_seconds() * 1000
+                
+                result = {
                     'answer': response.get('answer', ''),
                     'context': response.get('context', []),
+                }
+                results.append(result)
+                
+                # Log to table
+                logs.append({
+                    'timestamp': start_time,
+                    'request_id': request_id,
+                    'question': question,
+                    'answer': result['answer'],
+                    'context': str(result['context']),
+                    'latency_ms': latency_ms,
+                    'status': 'success',
+                    'error_message': None
                 })
+                
             except Exception as e:
+                end_time = datetime.now()
+                latency_ms = (end_time - start_time).total_seconds() * 1000
+                
                 results.append({
                     'answer': f"Error: {str(e)}",
                     'context': [],
-                    'sources': []
+                })
+                
+                logs.append({
+                    'timestamp': start_time,
+                    'request_id': request_id,
+                    'question': question,
+                    'answer': None,
+                    'context': None,
+                    'latency_ms': latency_ms,
+                    'status': 'error',
+                    'error_message': str(e)
                 })
         
+        # Write logs to Delta table (async, don't block response)
+        try:
+            self._write_logs_async(logs)
+        except:
+            pass  # Don't fail the request if logging fails
+        
         return results
+    
+    def _write_logs_async(self, logs):  # ← INDENTED (inside class)
+        """Write logs to Delta table asynchronously"""
+        try:
+            from pyspark.sql import SparkSession
+            import pandas as pd
+            
+            spark = SparkSession.builder.getOrCreate()
+            logs_df = pd.DataFrame(logs)
+            logs_df['date'] = pd.to_datetime(logs_df['timestamp']).dt.date
+            
+            spark_df = spark.createDataFrame(logs_df)
+            spark_df.write.mode("append").saveAsTable("main.default.gdpr_agent_inference_logs")
+        except Exception as e:
+            print(f"Warning: Failed to write logs: {e}")
 
 
 def register_staging_model(commit_sha: str, pass_rate: float):
