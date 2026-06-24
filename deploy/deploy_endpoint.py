@@ -13,7 +13,7 @@ from databricks.sdk.service.serving import (
     TrafficConfig,
     Route,
     AiGatewayConfig,
-    GatewayInferenceTableConfig
+    AiGatewayInferenceTableConfig
 )
 
 
@@ -51,7 +51,7 @@ def deploy_endpoint(
     
     # Configure the new AI Gateway Inference Table tracking mechanism
     ai_gateway_config = AiGatewayConfig(
-        inference_table_config=GatewayInferenceTableConfig(
+        inference_table_config=AiGatewayInferenceTableConfig(
             catalog_name="main",
             schema_name="default",
             table_name_prefix=f"{endpoint_name.replace('-', '_')}_logs",
