@@ -94,4 +94,76 @@ def deploy_endpoint(
             raise e
     
     # Wait for endpoint to reach operational status
-    wait_for_endpoint(w, endpoint
+    wait_for_endpoint(w, endpoint_name)
+    
+    print(f"\n✅ Deployment complete!", file=sys.stderr)
+    print(f"🔗 Endpoint URL: https://{w.config.host}/serving-endpoints/{endpoint_name}", file=sys.stderr)
+    
+    return endpoint_name
+
+
+def wait_for_endpoint(client: WorkspaceClient, endpoint_name: str, timeout: int = 1800):
+    """
+    Wait for endpoint to reach READY state.
+    """
+    start_time = time.time()
+    last_state = None
+    
+    while time.time() - start_time < timeout:
+        try:
+            endpoint = client.serving_endpoints.get(endpoint_name)
+            
+            # Safely parse out string state
+            if endpoint.state and endpoint.state.config_update:
+                state = str(endpoint.state.config_update.state)
+            else:
+                state = "READY"
+            
+            # Only print if state changed
+            if state != last_state:
+                elapsed = int(time.time() - start_time)
+                print(f"   Status: {state} ({elapsed}s elapsed)", file=sys.stderr)
+                last_state = state
+            
+            # Check if ready
+            if state in ["NOT_UPDATING", "READY"]:
+                print(f"✅ Endpoint is ready!", file=sys.stderr)
+                return endpoint
+            elif state == "UPDATE_FAILED":
+                raise Exception(f"❌ Endpoint update failed!")
+            
+        except Exception as e:
+            if "does not exist" in str(e).lower():
+                if time.time() - start_time < 60:
+                    print(f"   Waiting for endpoint to be created...", file=sys.stderr)
+                else:
+                    raise e
+            else:
+                raise e
+        
+        time.sleep(30)
+    
+    raise TimeoutError(f"❌ Endpoint did not become ready within {timeout}s")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Deploy model to serving endpoint")
+    parser.add_argument("--endpoint-name", required=True)
+    parser.add_argument("--model-name", required=True)
+    parser.add_argument("--model-version", required=True)
+    parser.add_argument("--workload-size", default="Small", choices=["Small", "Medium", "Large"])
+    
+    # Clean boolean helper text conversion
+    parser.add_argument("--scale-to-zero", type=lambda x: (str(x).lower() in ['true', '1', 'yes']), default=True)
+    
+    args = parser.parse_args()
+    
+    endpoint_name = deploy_endpoint(
+        endpoint_name=args.endpoint_name,
+        model_name=args.model_name,
+        model_version=args.model_version,
+        workload_size=args.workload_size,
+        scale_to_zero=args.scale_to_zero
+    )
+    
+    print(endpoint_name)  # Clean standard stdout print for GitHub variables
