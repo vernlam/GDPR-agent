@@ -20,11 +20,10 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
     
     def load_context(self, context):
         """Called when model is loaded for serving"""
-        # Import here to avoid issues during serialization
         from gdpr_agent.agent import GDPRAgent
         self.agent = GDPRAgent()
     
-    def predict(self, context, model_input):  # ← INDENTED (inside class)
+    def predict(self, context, model_input):
         """
         Handle inference requests with logging.
         """
@@ -65,20 +64,15 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
                 result = {
                     'answer': response.get('answer', ''),
                     'context': response.get('context', []),
+                    'metadata': {  # ADD METADATA FOR EXTERNAL LOGGING
+                        'request_id': request_id,
+                        'timestamp': start_time.isoformat(),
+                        'latency_ms': latency_ms,
+                        'status': 'success',
+                        'question': question
+                    }
                 }
                 results.append(result)
-                
-                # Log to table
-                logs.append({
-                    'timestamp': start_time,
-                    'request_id': request_id,
-                    'question': question,
-                    'answer': result['answer'],
-                    'context': str(result['context']),
-                    'latency_ms': latency_ms,
-                    'status': 'success',
-                    'error_message': None
-                })
                 
             except Exception as e:
                 end_time = datetime.now()
@@ -87,43 +81,18 @@ class GDPRAgentWrapper(mlflow.pyfunc.PythonModel):
                 results.append({
                     'answer': f"Error: {str(e)}",
                     'context': [],
+                    'metadata': {
+                        'request_id': request_id,
+                        'timestamp': start_time.isoformat(),
+                        'latency_ms': latency_ms,
+                        'status': 'error',
+                        'question': question,
+                        'error_message': str(e)
+                    }
                 })
-                
-                logs.append({
-                    'timestamp': start_time,
-                    'request_id': request_id,
-                    'question': question,
-                    'answer': None,
-                    'context': None,
-                    'latency_ms': latency_ms,
-                    'status': 'error',
-                    'error_message': str(e)
-                })
-        
-        # Write logs to Delta table (async, don't block response)
-        try:
-            self._write_logs_async(logs)
-        except:
-            pass  # Don't fail the request if logging fails
         
         return results
     
-    def _write_logs_async(self, logs):  # ← INDENTED (inside class)
-        """Write logs to Delta table asynchronously"""
-        try:
-            from pyspark.sql import SparkSession
-            import pandas as pd
-            
-            spark = SparkSession.builder.getOrCreate()
-            logs_df = pd.DataFrame(logs)
-            logs_df['date'] = pd.to_datetime(logs_df['timestamp']).dt.date
-            
-            spark_df = spark.createDataFrame(logs_df)
-            spark_df.write.mode("append").saveAsTable("main.default.gdpr_agent_inference_logs")
-        except Exception as e:
-            print(f"Warning: Failed to write logs: {e}")
-
-
 def register_staging_model(commit_sha: str, pass_rate: float):
     """
     Register a new model version to the staging registry.
