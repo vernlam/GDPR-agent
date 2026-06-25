@@ -23,28 +23,23 @@ class ErrorMonitor:
         """
         query = f"""
             SELECT 
-                p.date,
-                p.timestamp_ms,
-                p.request_id,
-                p.status_code,
-                get_json_object(p.request, '$.dataframe_split.data[0][0]') as question,
-                get_json_object(r.response, '$.predictions[0].answer') as answer,
+                date,
+                timestamp,
+                request_id,
+                question,
+                answer,
+                error_message,
+                status,
                 CASE 
-                    WHEN p.status_code != 200 THEN 'HTTP_ERROR'
-                    WHEN get_json_object(r.response, '$.predictions[0].answer') LIKE '%Error%' THEN 'AGENT_ERROR'
-                    WHEN get_json_object(r.response, '$.predictions[0].answer') LIKE '%Exception%' THEN 'AGENT_EXCEPTION'
+                    WHEN status = 'error' THEN 'HTTP_ERROR'
+                    WHEN status = 'exception' THEN 'AGENT_EXCEPTION'
+                    WHEN answer LIKE '%Error%' THEN 'AGENT_ERROR'
                     ELSE 'UNKNOWN'
                 END as error_type
-            FROM {config.payload_table} p
-            LEFT JOIN {config.response_table} r
-                ON p.request_id = r.request_id
-            WHERE p.date >= current_date() - {days_back}
-              AND (
-                  p.status_code != 200 
-                  OR get_json_object(r.response, '$.predictions[0].answer') LIKE '%Error%'
-                  OR get_json_object(r.response, '$.predictions[0].answer') LIKE '%Exception%'
-              )
-            ORDER BY p.timestamp_ms DESC
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+              AND status != 'success'
+            ORDER BY timestamp DESC
         """
         
         df = self.db.query_table(query)
@@ -64,7 +59,7 @@ class ErrorMonitor:
         # Get total requests
         total_query = f"""
             SELECT COUNT(*) as total_requests
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
         """
         total_result = self.db.query_table(total_query).first()
@@ -76,19 +71,14 @@ class ErrorMonitor:
                 COUNT(*) as total_errors,
                 COUNT(DISTINCT date) as days_with_errors,
                 CASE 
-                    WHEN p.status_code != 200 THEN 'HTTP_ERROR'
-                    WHEN get_json_object(r.response, '$.predictions[0].answer') LIKE '%Error%' THEN 'AGENT_ERROR'
+                    WHEN status = 'error' THEN 'HTTP_ERROR'
+                    WHEN status = 'exception' THEN 'AGENT_EXCEPTION'
                     ELSE 'OTHER'
                 END as error_type,
                 COUNT(*) as error_count
-            FROM {config.payload_table} p
-            LEFT JOIN {config.response_table} r
-                ON p.request_id = r.request_id
-            WHERE p.date >= current_date() - {days_back}
-              AND (
-                  p.status_code != 200 
-                  OR get_json_object(r.response, '$.predictions[0].answer') LIKE '%Error%'
-              )
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+              AND status != 'success'
             GROUP BY error_type
         """
         
@@ -123,18 +113,13 @@ class ErrorMonitor:
         """
         query = f"""
             SELECT 
-                get_json_object(p.request, '$.dataframe_split.data[0][0]') as question,
-                get_json_object(r.response, '$.predictions[0].answer') as error_message,
+                question,
+                error_message,
                 COUNT(*) as occurrence_count,
-                MAX(p.date) as last_occurred
-            FROM {config.payload_table} p
-            LEFT JOIN {config.response_table} r
-                ON p.request_id = r.request_id
-            WHERE p.date >= current_date() - {days_back}
-              AND (
-                  p.status_code != 200 
-                  OR get_json_object(r.response, '$.predictions[0].answer') LIKE '%Error%'
-              )
+                MAX(date) as last_occurred
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+              AND status != 'success'
             GROUP BY question, error_message
             ORDER BY occurrence_count DESC
             LIMIT {top_n}

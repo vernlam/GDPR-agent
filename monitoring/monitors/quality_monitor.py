@@ -20,6 +20,8 @@ class QualityMonitor:
         """
         Evaluate recent production queries.
         
+        Samples 10% of successful queries (excluding refusals) for LLM evaluation.
+        
         Args:
             days_back: Number of days to look back (default from config)
             sample_size: Number of queries to evaluate (default from config)
@@ -30,9 +32,33 @@ class QualityMonitor:
         days_back = days_back or config.DEFAULT_LOOKBACK_DAYS
         sample_size = sample_size or config.SAMPLE_SIZE_FOR_EVALUATION
         
-        print(f"🔍 Evaluating queries from last {days_back} days (sample size: {sample_size})")
+        # First, get count of valid queries (successful, non-refusal)
+        count_query = f"""
+            SELECT COUNT(*) as total_valid_queries
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+              AND status = 'success'
+              AND is_valid_answer = true
+        """
         
-        # Query recent inference logs
+        count_result = self.db.query_table(count_query).first()
+        total_valid = int(count_result.total_valid_queries) if count_result else 0
+        
+        if total_valid == 0:
+            print("⚠️  No valid queries found to evaluate")
+            return pd.DataFrame()
+        
+        # Calculate 10% sample size (but respect max sample_size)
+        target_sample = min(int(total_valid * 0.1), sample_size)
+        
+        if target_sample == 0:
+            target_sample = min(1, total_valid)  # At least 1 if any exist
+        
+        print(f"🔍 Evaluating queries from last {days_back} days")
+        print(f"   Total valid queries: {total_valid}")
+        print(f"   Sampling 10%: {target_sample} queries")
+        
+        # Query with random sampling
         query = f"""
             SELECT 
                 date,
@@ -43,9 +69,10 @@ class QualityMonitor:
                 context
             FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
-            AND status = 'success'
-            ORDER BY timestamp DESC
-            LIMIT {sample_size}
+              AND status = 'success'
+              AND is_valid_answer = true
+            ORDER BY RAND()
+            LIMIT {target_sample}
         """
         
         df = self.db.query_table(query)

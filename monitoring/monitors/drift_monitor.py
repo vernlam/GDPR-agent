@@ -24,11 +24,11 @@ class DriftMonitor:
         """
         query = f"""
             SELECT 
-                get_json_object(request, '$.dataframe_split.data[0][0]') as question,
+                question,
                 COUNT(*) as frequency,
                 MIN(date) as first_seen,
                 MAX(date) as last_seen
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
             GROUP BY question
             ORDER BY frequency DESC
@@ -50,10 +50,10 @@ class DriftMonitor:
         """
         query = f"""
             SELECT 
-                get_json_object(request, '$.dataframe_split.data[0][0]') as question,
+                question,
                 COUNT(*) as frequency,
                 COUNT(*) * 100.0 / SUM(COUNT(*)) OVER () as percentage
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
             GROUP BY question
             ORDER BY frequency DESC
@@ -82,8 +82,8 @@ class DriftMonitor:
             FROM (
                 SELECT 
                     date,
-                    explode(split(lower(get_json_object(request, '$.dataframe_split.data[0][0]')), ' ')) as keyword
-                FROM {config.payload_table}
+                    explode(split(lower(question), ' ')) as keyword
+                FROM {config.INFERENCE_LOGS_TABLE}
                 WHERE date >= current_date() - {days_back}
             )
             WHERE LENGTH(keyword) > 4
@@ -125,9 +125,9 @@ class DriftMonitor:
         # Get baseline distribution (older period)
         baseline_query = f"""
             SELECT 
-                get_json_object(request, '$.dataframe_split.data[0][0]') as question,
+                question,
                 COUNT(*) as frequency
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {baseline_days}
               AND date < current_date() - {recent_days}
             GROUP BY question
@@ -138,9 +138,9 @@ class DriftMonitor:
         # Get recent distribution
         recent_query = f"""
             SELECT 
-                get_json_object(request, '$.dataframe_split.data[0][0]') as question,
+                question,
                 COUNT(*) as frequency
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {recent_days}
             GROUP BY question
         """
@@ -151,6 +151,13 @@ class DriftMonitor:
             return {
                 "drift_detected": False,
                 "drift_score": 0.0,
+                "drift_threshold": drift_threshold,
+                "new_query_count": 0,
+                "new_query_rate": 0.0,
+                "disappeared_query_count": 0,
+                "disappeared_query_rate": 0.0,
+                "baseline_unique_queries": len(baseline_df),
+                "recent_unique_queries": len(recent_df),
                 "message": "Insufficient data for drift detection"
             }
         
@@ -205,12 +212,12 @@ class DriftMonitor:
         """
         query = f"""
             SELECT 
-                AVG(LENGTH(get_json_object(request, '$.dataframe_split.data[0][0]'))) as avg_length,
-                MIN(LENGTH(get_json_object(request, '$.dataframe_split.data[0][0]'))) as min_length,
-                MAX(LENGTH(get_json_object(request, '$.dataframe_split.data[0][0]'))) as max_length,
-                STDDEV(LENGTH(get_json_object(request, '$.dataframe_split.data[0][0]'))) as std_length,
-                percentile(LENGTH(get_json_object(request, '$.dataframe_split.data[0][0]')), 0.5) as median_length
-            FROM {config.payload_table}
+                AVG(LENGTH(question)) as avg_length,
+                MIN(LENGTH(question)) as min_length,
+                MAX(LENGTH(question)) as max_length,
+                STDDEV(LENGTH(question)) as std_length,
+                percentile(LENGTH(question), 0.5) as median_length
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
         """
         
@@ -237,10 +244,10 @@ class DriftMonitor:
         query = f"""
             SELECT 
                 date,
-                hour(from_unixtime(timestamp_ms/1000)) as hour_of_day,
+                hour(timestamp) as hour_of_day,
                 dayofweek(date) as day_of_week,
                 COUNT(*) as request_count
-            FROM {config.payload_table}
+            FROM {config.INFERENCE_LOGS_TABLE}
             WHERE date >= current_date() - {days_back}
             GROUP BY date, hour_of_day, day_of_week
             ORDER BY date DESC, hour_of_day

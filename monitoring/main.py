@@ -13,6 +13,7 @@ from monitoring.monitors.performance_monitor import PerformanceMonitor
 from monitoring.monitors.error_monitor import ErrorMonitor
 from monitoring.monitors.cost_monitor import CostMonitor
 from monitoring.monitors.drift_monitor import DriftMonitor
+from monitoring.monitors.refusal_monitor import RefusalMonitor
 
 def run_monitoring(days_back: int = None, sample_size: int = None):
     """
@@ -39,6 +40,7 @@ def run_monitoring(days_back: int = None, sample_size: int = None):
     error_monitor = ErrorMonitor(db_client)
     cost_monitor = CostMonitor(db_client)
     drift_monitor = DriftMonitor(db_client)
+    refusal_monitor = RefusalMonitor(db_client)
     
     # Store results
     results = {}
@@ -47,8 +49,8 @@ def run_monitoring(days_back: int = None, sample_size: int = None):
     print("\n1️⃣  Checking Endpoint Health...")
     try:
         endpoint_status = db_client.get_endpoint_status(config.ENDPOINT_NAME)
+        print(f"   Endpoint: {endpoint_status['name']}")
         print(f"   Status: {endpoint_status['state']}")
-        print(f"   URL: {endpoint_status['url']}")
         results['endpoint_status'] = endpoint_status
     except Exception as e:
         print(f"   ❌ Error: {e}")
@@ -105,9 +107,29 @@ def run_monitoring(days_back: int = None, sample_size: int = None):
     except Exception as e:
         print(f"   ❌ Error: {e}")
         results['performance_summary'] = {"error": str(e)}
+
+    # 4. Analyze refusals
+    print(f"\n4️⃣  Analyzing Refusals...")
+    try:
+        refusal_summary = refusal_monitor.analyze_refusals(days_back)
+        
+        if refusal_summary:
+            print(f"\n   Refusal Summary:")
+            print(f"   - Refusal Rate: {refusal_summary['refusal_rate']*100:.1f}%")
+            
+            alerts = refusal_monitor.check_refusal_thresholds(days_back=1)
+            if alerts:
+                print(f"\n   🚨 Refusal Alerts:")
+                for alert in alerts:
+                    print(f"   - [{alert['severity']}] {alert['message']}")
+        
+        results['refusal_summary'] = refusal_summary
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+        results['refusal_summary'] = {"error": str(e)}
     
-    # 4. Check for errors
-    print(f"\n4️⃣  Analyzing Errors...")
+    # 5. Check for errors
+    print(f"\n5️⃣  Analyzing Errors...")
     try:
         error_summary = error_monitor.get_error_summary(days_back)
         
@@ -145,8 +167,8 @@ def run_monitoring(days_back: int = None, sample_size: int = None):
         print(f"   ❌ Error: {e}")
         results['error_summary'] = {"error": str(e)}
     
-    # 5. Cost analysis
-    print(f"\n5️⃣  Analyzing Costs...")
+    # 6. Cost analysis
+    print(f"\n6️⃣  Analyzing Costs...")
     try:
         cost_summary = cost_monitor.get_cost_summary(days_back)
         
@@ -173,20 +195,23 @@ def run_monitoring(days_back: int = None, sample_size: int = None):
         print(f"   ❌ Error: {e}")
         results['cost_summary'] = {"error": str(e)}
     
-    # 6. Drift detection
-    print(f"\n6️⃣  Detecting Drift...")
+    # 7. Drift detection
+    print(f"\n7️⃣  Detecting Drift...")
     try:
         drift_results = drift_monitor.detect_distribution_drift()
         
-        if drift_results:
+        if drift_results and 'drift_score' in drift_results:
             print(f"\n   Drift Analysis:")
-            drift_status = '⚠️  YES' if drift_results['drift_detected'] else '✅ NO'
+            drift_status = '⚠️  YES' if drift_results.get('drift_detected', False) else '✅ NO'
             print(f"   - Drift Detected: {drift_status}")
-            print(f"   - Drift Score: {drift_results['drift_score']:.3f} (threshold: {drift_results['drift_threshold']})")
-            print(f"   - Baseline Queries: {drift_results['baseline_unique_queries']}")
-            print(f"   - Recent Queries: {drift_results['recent_unique_queries']}")
-            print(f"   - New Queries: {drift_results['new_query_count']} ({drift_results['new_query_rate']:.1%})")
-            print(f"   - Disappeared Queries: {drift_results['disappeared_query_count']} ({drift_results['disappeared_query_rate']:.1%})")
+            print(f"   - Drift Score: {drift_results['drift_score']:.3f} (threshold: {drift_results.get('drift_threshold', 0.3)})")
+            
+            # Only print detailed metrics if they exist
+            if 'baseline_unique_queries' in drift_results:
+                print(f"   - Baseline Queries: {drift_results['baseline_unique_queries']}")
+                print(f"   - Recent Queries: {drift_results['recent_unique_queries']}")
+                print(f"   - New Queries: {drift_results['new_query_count']} ({drift_results['new_query_rate']:.1%})")
+                print(f"   - Disappeared Queries: {drift_results['disappeared_query_count']} ({drift_results['disappeared_query_rate']:.1%})")
             results['drift_results'] = drift_results
             
             # Get top queries
@@ -250,9 +275,10 @@ if __name__ == "__main__":
     
     try:
         results = run_monitoring(args.days_back, args.sample_size)
-        sys.exit(0)
+        print("\n✅ Monitoring job completed successfully!")
+        # Don't call sys.exit() in Databricks jobs - it causes false failures
     except Exception as e:
         print(f"❌ Monitoring failed: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
-        sys.exit(1)
+        raise  # Re-raise exception to fail the job

@@ -24,19 +24,17 @@ class CostMonitor:
         """
         query = f"""
             SELECT 
-                p.date,
+                date,
                 COUNT(*) as request_count,
-                AVG(LENGTH(get_json_object(p.request, '$.dataframe_split.data[0][0]'))) as avg_question_length,
-                AVG(LENGTH(get_json_object(r.response, '$.predictions[0].answer'))) as avg_answer_length,
-                SUM(LENGTH(get_json_object(p.request, '$.dataframe_split.data[0][0]'))) as total_question_chars,
-                SUM(LENGTH(get_json_object(r.response, '$.predictions[0].answer'))) as total_answer_chars
-            FROM {config.payload_table} p
-            LEFT JOIN {config.response_table} r
-                ON p.request_id = r.request_id
-            WHERE p.date >= current_date() - {days_back}
-              AND p.status_code = 200
-            GROUP BY p.date
-            ORDER BY p.date DESC
+                AVG(LENGTH(question)) as avg_question_length,
+                AVG(LENGTH(answer)) as avg_answer_length,
+                SUM(LENGTH(question)) as total_question_chars,
+                SUM(LENGTH(COALESCE(answer, ''))) as total_answer_chars
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+              AND status = 'success'
+            GROUP BY date
+            ORDER BY date DESC
         """
         
         df = self.db.query_table(query)
@@ -50,12 +48,9 @@ class CostMonitor:
         # Input tokens: question (~100 chars) + context retrieval (~2000 chars) + system prompt (~500 chars)
         # Output tokens: answer length
         
-        pdf['estimated_input_tokens'] = pdf.apply(
-            lambda row: estimate_tokens(str(row['total_question_chars'])) + (row['request_count'] * 650),  # 650 tokens for context + system
-            axis=1
-        )
-        
-        pdf['estimated_output_tokens'] = pdf['total_answer_chars'].apply(estimate_tokens)
+        # Estimate tokens from character counts (4 chars ≈ 1 token)
+        pdf['estimated_input_tokens'] = (pdf['total_question_chars'] // 4) + (pdf['request_count'] * 650)  # 650 tokens for context + system
+        pdf['estimated_output_tokens'] = pdf['total_answer_chars'] // 4
         
         pdf['estimated_cost_usd'] = pdf.apply(
             lambda row: estimate_cost(

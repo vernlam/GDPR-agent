@@ -14,9 +14,11 @@ __version__ = "1.0.0"
 
 from monitoring.config import config, MonitoringConfig
 from monitoring.main import run_monitoring
+from monitoring.utils.request_logger import RequestLogger
 
 __all__ = [
     "config",
     "MonitoringConfig",
     "run_monitoring",
+    "RequestLogger"
 ]

@@ -18,19 +18,17 @@ class PerformanceMonitor:
         
         query = f"""
             SELECT 
-                p.date,
+                date,
                 COUNT(*) as total_requests,
-                COUNT(DISTINCT get_json_object(p.request, '$.dataframe_split.data[0][0]')) as unique_questions,
-                AVG((r.timestamp_ms - p.timestamp_ms) / 1000) as avg_latency_seconds,
-                MAX((r.timestamp_ms - p.timestamp_ms) / 1000) as max_latency_seconds,
-                MIN((r.timestamp_ms - p.timestamp_ms) / 1000) as min_latency_seconds,
-                SUM(CASE WHEN p.status_code = 200 THEN 1 ELSE 0 END) / COUNT(*) * 100 as success_rate_pct
-            FROM {config.payload_table} p
-            LEFT JOIN {config.response_table} r
-                ON p.request_id = r.request_id
-            WHERE p.date >= current_date() - {days_back}
-            GROUP BY p.date
-            ORDER BY p.date DESC
+                COUNT(DISTINCT question) as unique_questions,
+                AVG(latency_ms / 1000.0) as avg_latency_seconds,
+                MAX(latency_ms / 1000.0) as max_latency_seconds,
+                MIN(latency_ms / 1000.0) as min_latency_seconds,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*) * 100 as success_rate_pct
+            FROM {config.INFERENCE_LOGS_TABLE}
+            WHERE date >= current_date() - {days_back}
+            GROUP BY date
+            ORDER BY date DESC
         """
         
         df = self.db.query_table(query)

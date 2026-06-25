@@ -20,8 +20,8 @@ class DatabricksClient:
         endpoint = self.w.serving_endpoints.get(endpoint_name)
         return {
             "name": endpoint_name,
-            "state": str(endpoint.state.ready) if endpoint.state else "UNKNOWN",
-            "url": endpoint.url
+            "state": str(endpoint.state.ready) if endpoint.state else "UNKNOWN"
+            # Removed 'url' field - not available on ServingEndpointDetailed
         }
     
     def write_metrics(self, df: DataFrame, table_name: str):
