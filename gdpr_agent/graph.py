@@ -4,7 +4,7 @@ Constructs the agentic graph with nodes, edges, and conditional routing logic.
 """
 
 import logging
-from langgraph.graph import StateGraph, END, CompiledGraph
+from langgraph.graph import StateGraph, END
 from .state import AgentState
 from .nodes import (
     node_route_and_retrieve,
@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def build_agent() -> CompiledGraph:
+def build_agent():
     """
     Build and compile the GDPR compliance agent graph.
     
