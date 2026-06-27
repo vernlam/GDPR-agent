@@ -4,7 +4,8 @@ Handles GDPR legislation, corporate policy, and enforcement tracker documents.
 """
 
 import argparse
-from typing import List, Optional
+import logging
+from typing import List, Optional, Dict
 from pyspark.sql import SparkSession
 
 from config import SOURCES, CATALOG, SCHEMA
@@ -18,6 +19,12 @@ from utils.spark_helpers import (
     add_metadata_columns
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 def ingest_gdpr_legislation(spark: SparkSession) -> str:
     """
@@ -26,7 +33,7 @@ def ingest_gdpr_legislation(spark: SparkSession) -> str:
     Returns:
         Target table name
     """
-    print("📖 Ingesting GDPR Statutory Legislation...")
+    logger.info("Initiating GDPR statutory legislation ingestion")
     
     source_config = SOURCES["gdpr"]
     file_path = source_config["file"]
@@ -34,7 +41,7 @@ def ingest_gdpr_legislation(spark: SparkSession) -> str:
     
     # Parse markdown file
     records = parse_gdpr_markdown(file_path, spark)
-    print(f"   Parsed {len(records)} articles from markdown")
+    logger.info("Parsed %d articles from markdown file: %s", len(records), file_path)
     
     # Convert to DataFrame
     df = list_to_dataframe(records, spark)
@@ -52,7 +59,7 @@ def ingest_gdpr_legislation(spark: SparkSession) -> str:
     )
     
     row_count = get_table_row_count(table_name, spark)
-    print(f"✅ GDPR legislation ingested: {row_count} records → {table_name}\n")
+    logger.info("Successfully ingested GDPR legislation: %d records written to %s", row_count, table_name)
     
     return table_name
 
@@ -64,7 +71,7 @@ def ingest_corporate_policy(spark: SparkSession) -> str:
     Returns:
         Target table name
     """
-    print("📖 Ingesting Corporate Privacy Policy...")
+    logger.info("Initiating corporate privacy policy ingestion")
     
     source_config = SOURCES["policy"]
     file_path = source_config["file"]
@@ -72,7 +79,7 @@ def ingest_corporate_policy(spark: SparkSession) -> str:
     
     # Parse markdown file
     records = parse_policy_markdown(file_path, spark)
-    print(f"   Parsed {len(records)} sections from markdown")
+    logger.info("Parsed %d sections from markdown file: %s", len(records), file_path)
     
     # Convert to DataFrame
     df = list_to_dataframe(records, spark)
@@ -90,7 +97,7 @@ def ingest_corporate_policy(spark: SparkSession) -> str:
     )
     
     row_count = get_table_row_count(table_name, spark)
-    print(f"✅ Corporate policy ingested: {row_count} records → {table_name}\n")
+    logger.info("Successfully ingested corporate policy: %d records written to %s", row_count, table_name)
     
     return table_name
 
@@ -102,7 +109,7 @@ def ingest_enforcement_tracker(spark: SparkSession) -> str:
     Returns:
         Target table name
     """
-    print("📄 Ingesting Enforcement Tracker PDFs...")
+    logger.info("Initiating enforcement tracker PDF ingestion")
     
     source_config = SOURCES["enforcement"]
     volume_path = source_config["volume_path"]
@@ -114,7 +121,8 @@ def ingest_enforcement_tracker(spark: SparkSession) -> str:
     # Add metadata columns
     df = add_metadata_columns(df)
     
-    print(f"   Parsed {df.count()} PDF documents")
+    doc_count = df.count()
+    logger.info("Parsed %d PDF documents from volume: %s", doc_count, volume_path)
     
     # Write to Delta table
     write_to_delta(
@@ -126,12 +134,12 @@ def ingest_enforcement_tracker(spark: SparkSession) -> str:
     )
     
     row_count = get_table_row_count(table_name, spark)
-    print(f"✅ Enforcement tracker ingested: {row_count} documents → {table_name}\n")
+    logger.info("Successfully ingested enforcement tracker: %d documents written to %s", row_count, table_name)
     
     return table_name
 
 
-def ingest_all_sources(sources: Optional[List[str]] = None) -> dict:
+def ingest_all_sources(sources: Optional[List[str]] = None) -> Dict[str, str]:
     """
     Ingest all or specified data sources.
     
@@ -150,32 +158,32 @@ def ingest_all_sources(sources: Optional[List[str]] = None) -> dict:
     
     results = {}
     
-    print("=" * 70)
-    print("🚀 STARTING DOCUMENT INGESTION PIPELINE")
-    print("=" * 70 + "\n")
+    logger.info("=" * 70)
+    logger.info("STARTING DOCUMENT INGESTION PIPELINE")
+    logger.info("=" * 70)
     
     # Ingest each source
     if "gdpr" in sources:
         try:
             results["gdpr"] = ingest_gdpr_legislation(spark)
         except Exception as e:
-            print(f"❌ Failed to ingest GDPR: {e}\n")
+            logger.exception("Failed to ingest GDPR legislation: %s", e)
     
     if "policy" in sources:
         try:
             results["policy"] = ingest_corporate_policy(spark)
         except Exception as e:
-            print(f"❌ Failed to ingest policy: {e}\n")
+            logger.exception("Failed to ingest corporate policy: %s", e)
     
     if "enforcement" in sources:
         try:
             results["enforcement"] = ingest_enforcement_tracker(spark)
         except Exception as e:
-            print(f"❌ Failed to ingest enforcement tracker: {e}\n")
+            logger.exception("Failed to ingest enforcement tracker: %s", e)
     
-    print("=" * 70)
-    print(f"🎉 INGESTION COMPLETE - {len(results)}/{len(sources)} sources successful")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("INGESTION COMPLETE - %d/%d sources successful", len(results), len(sources))
+    logger.info("=" * 70)
     
     return results
 

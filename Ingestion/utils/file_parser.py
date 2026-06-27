@@ -4,12 +4,19 @@ Handles GDPR statutory legislation, corporate policy markdown, and enforcement t
 """
 
 import re
-from typing import List, Dict
-from pyspark.sql import SparkSession
+import logging
+from typing import List, Dict, Optional
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import expr, col
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-def _read_text_file(file_path: str, spark: SparkSession = None) -> str:
+
+def _read_text_file(file_path: str, spark: Optional[SparkSession] = None) -> str:
     """
     Read text file from Volume path using Spark.
     
@@ -24,11 +31,19 @@ def _read_text_file(file_path: str, spark: SparkSession = None) -> str:
         from pyspark.sql import SparkSession
         spark = SparkSession.builder.getOrCreate()
     
-    df = spark.read.text(file_path, wholetext=True)
-    return df.collect()[0][0]
+    logger.debug("Reading text file from path: %s", file_path)
+    
+    try:
+        df = spark.read.text(file_path, wholetext=True)
+        content = df.collect()[0][0]
+        logger.debug("Successfully read file: %d characters", len(content))
+        return content
+    except Exception as e:
+        logger.exception("Failed to read text file from path %s: %s", file_path, e)
+        raise
 
 
-def parse_gdpr_markdown(file_path: str, spark: SparkSession = None) -> List[Dict[str, str]]:
+def parse_gdpr_markdown(file_path: str, spark: Optional[SparkSession] = None) -> List[Dict[str, str]]:
     """
     Parse GDPR Chapter 3 markdown file into structured records.
     
@@ -39,7 +54,13 @@ def parse_gdpr_markdown(file_path: str, spark: SparkSession = None) -> List[Dict
     Returns:
         List of dictionaries containing parsed article records
     """
-    raw_text = _read_text_file(file_path, spark)
+    logger.info("Parsing GDPR markdown file: %s", file_path)
+    
+    try:
+        raw_text = _read_text_file(file_path, spark)
+    except Exception as e:
+        logger.exception("Failed to parse GDPR markdown file %s: %s", file_path, e)
+        raise
     
     # Split on Article headers (## Article N)
     segments = re.split(r'(?=\n##\s+Article\s+\d+)', raw_text)
@@ -73,10 +94,11 @@ def parse_gdpr_markdown(file_path: str, spark: SparkSession = None) -> List[Dict
             "scope_boundary": "Chapter 3 - Rights of the Data Subject"
         })
     
+    logger.info("Successfully parsed GDPR markdown: %d articles extracted", len(parsed_records))
     return parsed_records
 
 
-def parse_policy_markdown(file_path: str, spark: SparkSession = None) -> List[Dict[str, str]]:
+def parse_policy_markdown(file_path: str, spark: Optional[SparkSession] = None) -> List[Dict[str, str]]:
     """
     Parse retail privacy policy markdown file into structured records.
     
@@ -87,7 +109,13 @@ def parse_policy_markdown(file_path: str, spark: SparkSession = None) -> List[Di
     Returns:
         List of dictionaries containing parsed policy section records
     """
-    raw_text = _read_text_file(file_path, spark)
+    logger.info("Parsing corporate policy markdown file: %s", file_path)
+    
+    try:
+        raw_text = _read_text_file(file_path, spark)
+    except Exception as e:
+        logger.exception("Failed to parse policy markdown file %s: %s", file_path, e)
+        raise
     
     # Split on Section headers (## Section N)
     segments = re.split(r'(?=\n##\s+Section\s+\d+)', raw_text)
@@ -121,10 +149,11 @@ def parse_policy_markdown(file_path: str, spark: SparkSession = None) -> List[Di
             "document_type": "Internal Data Processing Matrix"
         })
     
+    logger.info("Successfully parsed corporate policy markdown: %d sections extracted", len(parsed_records))
     return parsed_records
 
 
-def parse_enforcement_pdfs(volume_path: str, spark: SparkSession):
+def parse_enforcement_pdfs(volume_path: str, spark: SparkSession) -> DataFrame:
     """
     Parse enforcement tracker PDFs using AI document parser.
     This function uses Spark SQL AI functions and returns a DataFrame.
@@ -134,23 +163,31 @@ def parse_enforcement_pdfs(volume_path: str, spark: SparkSession):
         spark: Active SparkSession
         
     Returns:
-        Spark DataFrame with flattened enforcement documents
+        Spark DataFrame with flattened enforcement documents (cached)
     """
-    # Step 1: Read binary PDF files
-    raw_binary_df = (spark.read
-                     .format("binaryFile")
-                     .option("pathGlobFilter", "*.pdf")
-                     .load(volume_path))
+    logger.info("Parsing enforcement tracker PDFs from volume: %s", volume_path)
     
-    # Step 2: Parse PDFs using AI function
-    parsed_raw_df = raw_binary_df.withColumn(
-        "ai_output", 
-        expr("ai_parse_document(content)")
-    )
+    # Step 1: Read binary PDF files (action - can fail)
+    logger.info("Reading PDF files from volume using binaryFile format")
+    try:
+        raw_binary_df = (spark.read
+                         .format("binaryFile")
+                         .option("pathGlobFilter", "*.pdf")
+                         .load(volume_path))
+        pdf_count = raw_binary_df.count()
+        logger.info("Found %d PDF files to parse", pdf_count)
+    except Exception as e:
+        logger.exception("Failed to read PDF files from volume %s: %s", volume_path, e)
+        raise
     
-    # Step 3: Flatten the document elements
-    final_flattened_df = parsed_raw_df.select(
+    # Step 2: Define transformations (lazy - cannot fail, just building execution plan)
+    # Using chained select() calls instead of withColumn() to avoid nested execution plans
+    logger.info("Defining PDF parsing transformations")
+    final_flattened_df = raw_binary_df.select(
         expr("element_at(split(path, '/'), -1)").alias("source_file_name"),
+        expr("ai_parse_document(content)").alias("ai_output")
+    ).select(
+        col("source_file_name"),
         
         # Extract page count
         expr("""
@@ -175,6 +212,14 @@ def parse_enforcement_pdfs(volume_path: str, spark: SparkSession):
                 )
             )
         """).alias("full_document_text")
-    )
+    ).cache()  # Mark for caching
     
-    return final_flattened_df
+    # Step 3: Execute transformations (action - can fail)
+    logger.info("Executing PDF parsing and flattening transformations")
+    try:
+        result_count = final_flattened_df.count()
+        logger.info("Successfully parsed and flattened %d enforcement PDFs", result_count)
+        return final_flattened_df
+    except Exception as e:
+        logger.exception("Failed to parse and flatten enforcement PDFs: %s", e)
+        raise

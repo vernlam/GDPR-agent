@@ -4,7 +4,8 @@ Creates vector representations for GDPR legislation, corporate policy, and enfor
 """
 
 import argparse
-from typing import List, Optional
+import logging
+from typing import List, Optional, Dict
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, expr, length
 
@@ -17,24 +18,37 @@ from utils.spark_helpers import (
     add_metadata_columns
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 def vectorize_gdpr_legislation(spark: SparkSession) -> str:
     """
     Generate embeddings for GDPR statutory legislation.
     
+    Args:
+        spark: Active SparkSession
+    
     Returns:
         Target embeddings table name
     """
-    print("🔢 Vectorizing GDPR Statutory Legislation...")
+    logger.info("Initiating GDPR statutory legislation vectorization")
     
     source_config = SOURCES["gdpr"]
     source_table = source_config["table"]
     embeddings_table = source_config["embeddings_table"]
     
+    logger.info("Source table: %s", source_table)
+    logger.info("Target embeddings table: %s", embeddings_table)
+    
     # Read source table
     df = spark.table(source_table)
     
     # Generate embeddings on text_content column
+    logger.info("Generating embeddings using model: %s", EMBEDDING_MODEL)
     embeddings_df = df.withColumn(
         "embedding",
         expr(f"ai_generate_embedding('{EMBEDDING_MODEL}', text_content)")
@@ -54,7 +68,7 @@ def vectorize_gdpr_legislation(spark: SparkSession) -> str:
     )
     
     row_count = get_table_row_count(embeddings_table, spark)
-    print(f"✅ GDPR embeddings generated: {row_count} records → {embeddings_table}\n")
+    logger.info("GDPR embeddings generated successfully: %d records written to %s", row_count, embeddings_table)
     
     return embeddings_table
 
@@ -63,19 +77,26 @@ def vectorize_corporate_policy(spark: SparkSession) -> str:
     """
     Generate embeddings for corporate privacy policy.
     
+    Args:
+        spark: Active SparkSession
+    
     Returns:
         Target embeddings table name
     """
-    print("🔢 Vectorizing Corporate Privacy Policy...")
+    logger.info("Initiating corporate privacy policy vectorization")
     
     source_config = SOURCES["policy"]
     source_table = source_config["table"]
     embeddings_table = source_config["embeddings_table"]
     
+    logger.info("Source table: %s", source_table)
+    logger.info("Target embeddings table: %s", embeddings_table)
+    
     # Read source table
     df = spark.table(source_table)
     
     # Generate embeddings on text_content column
+    logger.info("Generating embeddings using model: %s", EMBEDDING_MODEL)
     embeddings_df = df.withColumn(
         "embedding",
         expr(f"ai_generate_embedding('{EMBEDDING_MODEL}', text_content)")
@@ -95,7 +116,7 @@ def vectorize_corporate_policy(spark: SparkSession) -> str:
     )
     
     row_count = get_table_row_count(embeddings_table, spark)
-    print(f"✅ Corporate policy embeddings generated: {row_count} records → {embeddings_table}\n")
+    logger.info("Corporate policy embeddings generated successfully: %d records written to %s", row_count, embeddings_table)
     
     return embeddings_table
 
@@ -105,12 +126,13 @@ def vectorize_enforcement_tracker(spark: SparkSession, use_translated: bool = Tr
     Generate embeddings for enforcement tracker documents.
     
     Args:
+        spark: Active SparkSession
         use_translated: If True, uses translated table; otherwise uses raw table
         
     Returns:
         Target embeddings table name
     """
-    print("🔢 Vectorizing Enforcement Tracker Documents...")
+    logger.info("Initiating enforcement tracker vectorization")
     
     source_config = SOURCES["enforcement"]
     
@@ -118,22 +140,26 @@ def vectorize_enforcement_tracker(spark: SparkSession, use_translated: bool = Tr
     if use_translated:
         source_table = source_config["translated_table"]
         text_column = "full_document_text_translated"
-        print(f"   Using translated documents from {source_table}")
+        logger.info("Using translated documents from table: %s", source_table)
     else:
         source_table = source_config["raw_table"]
         text_column = "full_document_text"
-        print(f"   Using raw documents from {source_table}")
+        logger.info("Using raw multilingual documents from table: %s", source_table)
     
     embeddings_table = source_config["embeddings_table"]
+    logger.info("Target embeddings table: %s", embeddings_table)
     
     # Check if source table exists
     if not table_exists(source_table, spark):
+        error_msg = "Source table %s does not exist. Run ingestion/translation first."
+        logger.error(error_msg, source_table)
         raise ValueError(f"Source table {source_table} does not exist. Run ingestion/translation first.")
     
     # Read source table
     df = spark.table(source_table)
     
     # Generate embeddings on the appropriate text column
+    logger.info("Generating embeddings using model: %s on column: %s", EMBEDDING_MODEL, text_column)
     embeddings_df = df.withColumn(
         "embedding",
         expr(f"ai_generate_embedding('{EMBEDDING_MODEL}', {text_column})")
@@ -155,7 +181,7 @@ def vectorize_enforcement_tracker(spark: SparkSession, use_translated: bool = Tr
     )
     
     row_count = get_table_row_count(embeddings_table, spark)
-    print(f"✅ Enforcement embeddings generated: {row_count} documents → {embeddings_table}\n")
+    logger.info("Enforcement tracker embeddings generated successfully: %d documents written to %s", row_count, embeddings_table)
     
     return embeddings_table
 
@@ -163,7 +189,7 @@ def vectorize_enforcement_tracker(spark: SparkSession, use_translated: bool = Tr
 def vectorize_all_sources(
     sources: Optional[List[str]] = None,
     use_translated_enforcement: bool = True
-) -> dict:
+) -> Dict[str, str]:
     """
     Generate embeddings for all or specified data sources.
     
@@ -183,23 +209,24 @@ def vectorize_all_sources(
     
     results = {}
     
-    print("=" * 70)
-    print("🚀 STARTING VECTORIZATION PIPELINE")
-    print("=" * 70 + "\n")
-    print(f"Embedding Model: {EMBEDDING_MODEL}\n")
+    logger.info("=" * 70)
+    logger.info("STARTING VECTORIZATION PIPELINE")
+    logger.info("=" * 70)
+    logger.info("Embedding model: %s", EMBEDDING_MODEL)
+    logger.info("Sources to vectorize: %s", ', '.join(sources))
     
     # Vectorize each source
     if "gdpr" in sources:
         try:
             results["gdpr"] = vectorize_gdpr_legislation(spark)
         except Exception as e:
-            print(f"❌ Failed to vectorize GDPR: {e}\n")
+            logger.exception("Failed to vectorize GDPR statutory legislation: %s", e)
     
     if "policy" in sources:
         try:
             results["policy"] = vectorize_corporate_policy(spark)
         except Exception as e:
-            print(f"❌ Failed to vectorize policy: {e}\n")
+            logger.exception("Failed to vectorize corporate policy: %s", e)
     
     if "enforcement" in sources:
         try:
@@ -208,11 +235,11 @@ def vectorize_all_sources(
                 use_translated=use_translated_enforcement
             )
         except Exception as e:
-            print(f"❌ Failed to vectorize enforcement tracker: {e}\n")
+            logger.exception("Failed to vectorize enforcement tracker: %s", e)
     
-    print("=" * 70)
-    print(f"🎉 VECTORIZATION COMPLETE - {len(results)}/{len(sources)} sources successful")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("VECTORIZATION COMPLETE - %d/%d sources successful", len(results), len(sources))
+    logger.info("=" * 70)
     
     return results
 

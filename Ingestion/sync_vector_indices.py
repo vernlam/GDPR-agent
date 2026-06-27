@@ -4,11 +4,18 @@ Triggers sync operations to update vector indices with latest embeddings.
 """
 
 import argparse
-from typing import List, Optional
+import logging
+from typing import List, Optional, Dict, Any
 from databricks.vector_search.client import VectorSearchClient
 
 from config import SOURCES, VECTOR_ENDPOINT
 from utils.spark_helpers import get_or_create_spark, table_exists
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def sync_vector_index(
@@ -24,12 +31,14 @@ def sync_vector_index(
         source_table: Source embeddings table
         endpoint_name: Vector search endpoint name
     """
-    print(f"🔄 Syncing vector index: {index_name}")
-    print(f"   Source: {source_table}")
+    logger.info("Initiating vector index sync: %s", index_name)
+    logger.info("Source embeddings table: %s", source_table)
     
     # Verify source table exists
     spark = get_or_create_spark()
     if not table_exists(source_table, spark):
+        error_msg = "Source embeddings table does not exist: %s"
+        logger.error(error_msg, source_table)
         raise ValueError(f"Source table {source_table} does not exist")
     
     # Initialize Vector Search client
@@ -42,10 +51,10 @@ def sync_vector_index(
         # Trigger sync
         index.sync()
         
-        print(f"✅ Vector index synced successfully: {index_name}\n")
+        logger.info("Vector index synced successfully: %s", index_name)
         
     except Exception as e:
-        print(f"❌ Failed to sync {index_name}: {e}\n")
+        logger.exception("Failed to sync vector index %s: %s", index_name, e)
         raise
 
 
@@ -56,7 +65,7 @@ def sync_gdpr_index() -> str:
     Returns:
         Index name
     """
-    print("📚 Syncing GDPR Vector Index...")
+    logger.info("Syncing GDPR statutory legislation vector index")
     
     source_config = SOURCES["gdpr"]
     index_name = source_config["vector_index"]
@@ -77,7 +86,7 @@ def sync_policy_index() -> str:
     Returns:
         Index name
     """
-    print("📚 Syncing Corporate Policy Vector Index...")
+    logger.info("Syncing corporate privacy policy vector index")
     
     source_config = SOURCES["policy"]
     index_name = source_config["vector_index"]
@@ -98,7 +107,7 @@ def sync_enforcement_index() -> str:
     Returns:
         Index name
     """
-    print("📚 Syncing Enforcement Tracker Vector Index...")
+    logger.info("Syncing enforcement tracker vector index")
     
     source_config = SOURCES["enforcement"]
     index_name = source_config["vector_index"]
@@ -112,7 +121,7 @@ def sync_enforcement_index() -> str:
     return index_name
 
 
-def sync_all_indices(sources: Optional[List[str]] = None) -> dict:
+def sync_all_indices(sources: Optional[List[str]] = None) -> Dict[str, str]:
     """
     Sync all or specified vector search indices.
     
@@ -129,38 +138,39 @@ def sync_all_indices(sources: Optional[List[str]] = None) -> dict:
     
     results = {}
     
-    print("=" * 70)
-    print("🚀 STARTING VECTOR INDEX SYNC")
-    print("=" * 70 + "\n")
-    print(f"Vector Search Endpoint: {VECTOR_ENDPOINT}\n")
+    logger.info("=" * 70)
+    logger.info("STARTING VECTOR INDEX SYNC")
+    logger.info("=" * 70)
+    logger.info("Vector Search Endpoint: %s", VECTOR_ENDPOINT)
+    logger.info("Sources to sync: %s", ', '.join(sources))
     
     # Sync each index
     if "gdpr" in sources:
         try:
             results["gdpr"] = sync_gdpr_index()
         except Exception as e:
-            print(f"❌ Failed to sync GDPR index: {e}\n")
+            logger.exception("Failed to sync GDPR vector index: %s", e)
     
     if "policy" in sources:
         try:
             results["policy"] = sync_policy_index()
         except Exception as e:
-            print(f"❌ Failed to sync policy index: {e}\n")
+            logger.exception("Failed to sync corporate policy vector index: %s", e)
     
     if "enforcement" in sources:
         try:
             results["enforcement"] = sync_enforcement_index()
         except Exception as e:
-            print(f"❌ Failed to sync enforcement index: {e}\n")
+            logger.exception("Failed to sync enforcement tracker vector index: %s", e)
     
-    print("=" * 70)
-    print(f"🎉 INDEX SYNC COMPLETE - {len(results)}/{len(sources)} indices successful")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("VECTOR INDEX SYNC COMPLETE - %d/%d indices successful", len(results), len(sources))
+    logger.info("=" * 70)
     
     return results
 
 
-def check_index_status(index_name: str, endpoint_name: str = VECTOR_ENDPOINT) -> dict:
+def check_index_status(index_name: str, endpoint_name: str = VECTOR_ENDPOINT) -> Dict[str, Any]:
     """
     Check the status of a vector search index.
     
@@ -187,6 +197,7 @@ def check_index_status(index_name: str, endpoint_name: str = VECTOR_ENDPOINT) ->
         }
         
     except Exception as e:
+        logger.exception("Failed to retrieve status for vector index %s: %s", index_name, e)
         return {
             "name": index_name,
             "status": "ERROR",
@@ -194,7 +205,7 @@ def check_index_status(index_name: str, endpoint_name: str = VECTOR_ENDPOINT) ->
         }
 
 
-def check_all_indices_status(sources: Optional[List[str]] = None) -> dict:
+def check_all_indices_status(sources: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
     """
     Check status of all vector search indices.
     
@@ -210,9 +221,9 @@ def check_all_indices_status(sources: Optional[List[str]] = None) -> dict:
     
     statuses = {}
     
-    print("=" * 70)
-    print("📊 VECTOR INDEX STATUS CHECK")
-    print("=" * 70 + "\n")
+    logger.info("=" * 70)
+    logger.info("VECTOR INDEX STATUS CHECK")
+    logger.info("=" * 70)
     
     for source in sources:
         if source in SOURCES:
@@ -220,13 +231,16 @@ def check_all_indices_status(sources: Optional[List[str]] = None) -> dict:
             status = check_index_status(index_name)
             statuses[source] = status
             
-            print(f"{source.upper()} Index: {index_name}")
-            print(f"   Status: {status.get('status', 'UNKNOWN')}")
-            print(f"   Ready: {status.get('ready', False)}")
-            print(f"   Indexed Rows: {status.get('indexed_rows', 0)}")
+            logger.info("%s Index: %s", source.upper(), index_name)
+            logger.info("  Status: %s", status.get('status', 'UNKNOWN'))
+            logger.info("  Ready: %s", status.get('ready', False))
+            logger.info("  Indexed Rows: %d", status.get('indexed_rows', 0))
             if "error" in status:
-                print(f"   Error: {status['error']}")
-            print()
+                logger.error("  Error: %s", status['error'])
+    
+    logger.info("=" * 70)
+    logger.info("Status check complete for %d indices", len(statuses))
+    logger.info("=" * 70)
     
     return statuses
 

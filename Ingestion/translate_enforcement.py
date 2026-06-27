@@ -4,15 +4,23 @@ Translates multilingual GDPR enforcement precedents to English.
 """
 
 import argparse
+import logging
+from typing import Optional
 from pyspark.sql import SparkSession
 
 from config import SOURCES, TRANSLATION_TARGET_LANGUAGE, TRANSLATION_CHUNK_SIZE
 from utils.translation_utils import translate_enforcement_documents as translate_util
 from utils.spark_helpers import get_or_create_spark, table_exists, get_table_row_count
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 def translate_enforcement_documents(
-    spark: SparkSession = None,
+    spark: Optional[SparkSession] = None,
     target_language: str = TRANSLATION_TARGET_LANGUAGE,
     chunk_size: int = TRANSLATION_CHUNK_SIZE
 ) -> str:
@@ -34,35 +42,42 @@ def translate_enforcement_documents(
     source_table = source_config["raw_table"]
     target_table = source_config["translated_table"]
     
-    print("=" * 70)
-    print("🌐 ENFORCEMENT DOCUMENT TRANSLATION")
-    print("=" * 70 + "\n")
+    logger.info("=" * 70)
+    logger.info("ENFORCEMENT DOCUMENT TRANSLATION")
+    logger.info("=" * 70)
     
     # Verify source table exists
     if not table_exists(source_table, spark):
+        error_msg = "Source table %s does not exist. Run ingestion first."
+        logger.error(error_msg, source_table)
         raise ValueError(f"Source table {source_table} does not exist. Run ingestion first.")
     
     source_count = get_table_row_count(source_table, spark)
-    print(f"📄 Source documents: {source_count}")
-    print(f"🎯 Target language: {target_language}")
-    print(f"✂️  Chunk size: {chunk_size} characters\n")
+    logger.info("Source documents to translate: %d", source_count)
+    logger.info("Target language: %s", target_language)
+    logger.info("Translation chunk size: %d characters", chunk_size)
     
     # Run translation
-    translated_df = translate_util(
-        source_table=source_table,
-        target_table=target_table,
-        spark=spark,
-        target_language=target_language,
-        chunk_size=chunk_size
-    )
+    logger.info("Initiating translation pipeline")
+    try:
+        translated_df = translate_util(
+            source_table=source_table,
+            target_table=target_table,
+            spark=spark,
+            target_language=target_language,
+            chunk_size=chunk_size
+        )
+    except Exception as e:
+        logger.exception("Translation pipeline failed: %s", e)
+        raise
     
     target_count = get_table_row_count(target_table, spark)
     
-    print("\n" + "=" * 70)
-    print("✅ TRANSLATION COMPLETE")
-    print("=" * 70)
-    print(f"📊 Translated documents: {target_count}")
-    print(f"💾 Saved to: {target_table}\n")
+    logger.info("=" * 70)
+    logger.info("TRANSLATION COMPLETE")
+    logger.info("=" * 70)
+    logger.info("Translated documents: %d", target_count)
+    logger.info("Translated documents saved to table: %s", target_table)
     
     return target_table
 

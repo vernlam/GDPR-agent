@@ -3,12 +3,21 @@ Translation utilities for multilingual compliance documents.
 Uses Databricks SQL AI translation functions for batch processing.
 """
 
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, expr, explode, concat_ws, struct, array_sort, collect_list, lit, size, length
 import re
+import logging
+from typing import List
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import col, expr, explode, concat_ws, struct, array_sort, collect_list, lit, size, length
+from pyspark.sql.types import ArrayType, StringType
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
-def chunk_text(text: str, max_chars: int = 3000) -> list[str]:
+def chunk_text(text: str, max_chars: int = 3000) -> List[str]:
     """
     Split text into chunks at sentence boundaries, respecting max character limit.
     
@@ -43,10 +52,10 @@ def chunk_text(text: str, max_chars: int = 3000) -> list[str]:
 def translate_enforcement_documents(
     source_table: str,
     target_table: str,
-    spark,
+    spark: SparkSession,
     target_language: str = "English",
     chunk_size: int = 3000
-):
+) -> DataFrame:
     """
     Translate enforcement tracker documents using AI translation.
     
@@ -60,26 +69,44 @@ def translate_enforcement_documents(
     Returns:
         Translated DataFrame
     """
+    logger.info("Initiating translation pipeline for enforcement documents")
+    logger.info("Source table: %s", source_table)
+    logger.info("Target table: %s", target_table)
+    logger.info("Target language: %s", target_language)
+    logger.info("Chunk size: %d characters", chunk_size)
+    
     # Register the chunking UDF
-    from pyspark.sql.types import ArrayType, StringType
+    logger.debug("Registering chunk_text UDF")
     spark.udf.register("chunk_text", lambda text: chunk_text(text, chunk_size), ArrayType(StringType()))
     
     # Read source documents
-    source_df = spark.table(source_table)
+    logger.info("Reading source documents from table: %s", source_table)
+    try:
+        source_df = spark.table(source_table)
+    except Exception as e:
+        logger.exception("Failed to read source table %s: %s", source_table, e)
+        raise
     
     # Step 1: Create chunks with sequential IDs
+    logger.info("Step 1: Chunking documents for translation")
     chunked_df = source_df.select(
         col("source_file_name"),
         col("source_page_count"),
-        explode(expr(f"chunk_text(full_document_text)")).alias("chunk_text")
+        explode(expr("chunk_text(full_document_text)")).alias("chunk_text")
     ).withColumn(
         "chunk_id",
         expr("row_number() over (partition by source_file_name order by monotonically_increasing_id())")
     )
     
-    print(f"📦 Created {chunked_df.count()} chunks for translation")
+    try:
+        chunk_count = chunked_df.count()
+        logger.info("Created %d text chunks for translation", chunk_count)
+    except Exception as e:
+        logger.exception("Failed to create text chunks: %s", e)
+        raise
     
     # Step 2: Translate each chunk using AI function
+    logger.info("Step 2: Translating chunks using AI translation function")
     translated_df = chunked_df.withColumn(
         "translated_text",
         expr(f"ai_translate(chunk_text, '{target_language}')")
@@ -90,6 +117,7 @@ def translate_enforcement_documents(
     )
     
     # Step 3: Reassemble chunks back into full documents
+    logger.info("Step 3: Reassembling translated chunks into full documents")
     reassembled_df = translated_df.groupBy("source_file_name", "source_page_count").agg(
         concat_ws("\n\n", 
             array_sort(
@@ -110,6 +138,7 @@ def translate_enforcement_documents(
     )
     
     # Step 4: Add translation quality metrics
+    logger.info("Step 4: Computing translation quality metrics")
     final_df = reassembled_df.withColumn(
         "translation_ratio",
         expr("length(full_document_text_translated) / length(full_document_text_original)")
@@ -118,19 +147,28 @@ def translate_enforcement_documents(
     )
     
     # Validation check
-    low_quality = final_df.filter(col("translation_ratio") < 0.6).count()
-    if low_quality > 0:
-        print(f"⚠️  Warning: {low_quality} documents have translation ratio < 0.6")
-    else:
-        print(f"✅ All translations passed quality check")
+    logger.info("Validating translation quality")
+    try:
+        low_quality = final_df.filter(col("translation_ratio") < 0.6).count()
+        if low_quality > 0:
+            logger.warning("Translation quality warning: %d documents have translation ratio < 0.6", low_quality)
+        else:
+            logger.info("Translation quality validation passed: all documents meet quality threshold")
+    except Exception as e:
+        logger.exception("Failed to validate translation quality: %s", e)
+        raise
     
     # Save to target table
-    (final_df.write
-        .format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .saveAsTable(target_table))
-    
-    print(f"🎉 Translated documents saved to {target_table}")
+    logger.info("Writing translated documents to target table: %s", target_table)
+    try:
+        (final_df.write
+            .format("delta")
+            .mode("overwrite")
+            .option("overwriteSchema", "true")
+            .saveAsTable(target_table))
+        logger.info("Successfully saved translated documents to table: %s", target_table)
+    except Exception as e:
+        logger.exception("Failed to write translated documents to table %s: %s", target_table, e)
+        raise
     
     return final_df

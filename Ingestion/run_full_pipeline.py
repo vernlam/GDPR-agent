@@ -4,7 +4,8 @@ Orchestrates ingestion, translation, vectorization, and index synchronization.
 """
 
 import argparse
-from typing import List, Optional
+import logging
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from ingest_documents import ingest_all_sources
@@ -13,13 +14,19 @@ from vectorize_documents import vectorize_all_sources
 from sync_vector_indices import sync_all_indices, check_all_indices_status
 from utils.spark_helpers import get_or_create_spark
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 def run_full_pipeline(
     sources: Optional[List[str]] = None,
     skip_translation: bool = False,
     skip_sync: bool = False,
     check_status_after: bool = True
-) -> dict:
+) -> Dict[str, Any]:
     """
     Run the complete compliance document pipeline.
     
@@ -53,19 +60,19 @@ def run_full_pipeline(
         "stages": {}
     }
     
-    print("\n" + "=" * 80)
-    print("🚀 STARTING FULL COMPLIANCE DOCUMENT PIPELINE")
-    print("=" * 80)
-    print(f"⏰ Started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"📦 Processing sources: {', '.join(sources)}")
-    print("=" * 80 + "\n")
+    logger.info("=" * 80)
+    logger.info("STARTING FULL COMPLIANCE DOCUMENT PIPELINE")
+    logger.info("=" * 80)
+    logger.info("Pipeline started at: %s", start_time.strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info("Processing sources: %s", ', '.join(sources))
+    logger.info("=" * 80)
     
     # ============================================================================
     # STAGE 1: INGEST DOCUMENTS
     # ============================================================================
-    print("\n" + "=" * 80)
-    print("📥 STAGE 1: DOCUMENT INGESTION")
-    print("=" * 80 + "\n")
+    logger.info("=" * 80)
+    logger.info("STAGE 1: DOCUMENT INGESTION")
+    logger.info("=" * 80)
     
     try:
         ingestion_results = ingest_all_sources(sources=sources)
@@ -73,22 +80,22 @@ def run_full_pipeline(
             "status": "success",
             "tables": ingestion_results
         }
-        print(f"✅ Ingestion completed: {len(ingestion_results)} sources processed\n")
+        logger.info("Ingestion stage completed successfully: %d sources processed", len(ingestion_results))
     except Exception as e:
         results["stages"]["ingestion"] = {
             "status": "failed",
             "error": str(e)
         }
-        print(f"❌ Ingestion failed: {e}\n")
+        logger.exception("Ingestion stage failed: %s", e)
         return results
     
     # ============================================================================
     # STAGE 2: TRANSLATE ENFORCEMENT DOCUMENTS (if enforcement is included)
     # ============================================================================
     if "enforcement" in sources and not skip_translation:
-        print("\n" + "=" * 80)
-        print("🌐 STAGE 2: ENFORCEMENT DOCUMENT TRANSLATION")
-        print("=" * 80 + "\n")
+        logger.info("=" * 80)
+        logger.info("STAGE 2: ENFORCEMENT DOCUMENT TRANSLATION")
+        logger.info("=" * 80)
         
         try:
             translation_result = translate_enforcement_documents(spark=spark)
@@ -96,25 +103,25 @@ def run_full_pipeline(
                 "status": "success",
                 "table": translation_result
             }
-            print(f"✅ Translation completed\n")
+            logger.info("Translation stage completed successfully")
         except Exception as e:
             results["stages"]["translation"] = {
                 "status": "failed",
                 "error": str(e)
             }
-            print(f"❌ Translation failed: {e}\n")
-            print("⚠️  Pipeline will continue with raw enforcement documents\n")
+            logger.exception("Translation stage failed: %s", e)
+            logger.warning("Pipeline will continue with raw enforcement documents")
     else:
         if "enforcement" in sources and skip_translation:
-            print("\n⏭️  Skipping translation (--skip-translation flag)\n")
+            logger.info("Skipping translation stage (skip_translation flag enabled)")
             results["stages"]["translation"] = {"status": "skipped"}
     
     # ============================================================================
     # STAGE 3: VECTORIZE DOCUMENTS
     # ============================================================================
-    print("\n" + "=" * 80)
-    print("🔢 STAGE 3: DOCUMENT VECTORIZATION")
-    print("=" * 80 + "\n")
+    logger.info("=" * 80)
+    logger.info("STAGE 3: DOCUMENT VECTORIZATION")
+    logger.info("=" * 80)
     
     try:
         # Use translated enforcement docs if translation succeeded
@@ -132,22 +139,22 @@ def run_full_pipeline(
             "status": "success",
             "tables": vectorization_results
         }
-        print(f"✅ Vectorization completed: {len(vectorization_results)} sources processed\n")
+        logger.info("Vectorization stage completed successfully: %d sources processed", len(vectorization_results))
     except Exception as e:
         results["stages"]["vectorization"] = {
             "status": "failed",
             "error": str(e)
         }
-        print(f"❌ Vectorization failed: {e}\n")
+        logger.exception("Vectorization stage failed: %s", e)
         return results
     
     # ============================================================================
     # STAGE 4: SYNC VECTOR INDICES
     # ============================================================================
     if not skip_sync:
-        print("\n" + "=" * 80)
-        print("🔄 STAGE 4: VECTOR INDEX SYNCHRONIZATION")
-        print("=" * 80 + "\n")
+        logger.info("=" * 80)
+        logger.info("STAGE 4: VECTOR INDEX SYNCHRONIZATION")
+        logger.info("=" * 80)
         
         try:
             sync_results = sync_all_indices(sources=sources)
@@ -155,24 +162,24 @@ def run_full_pipeline(
                 "status": "success",
                 "indices": sync_results
             }
-            print(f"✅ Index sync completed: {len(sync_results)} indices synced\n")
+            logger.info("Vector index synchronization completed successfully: %d indices synced", len(sync_results))
         except Exception as e:
             results["stages"]["sync"] = {
                 "status": "failed",
                 "error": str(e)
             }
-            print(f"❌ Index sync failed: {e}\n")
+            logger.exception("Vector index synchronization failed: %s", e)
     else:
-        print("\n⏭️  Skipping index sync (--skip-sync flag)\n")
+        logger.info("Skipping index sync stage (skip_sync flag enabled)")
         results["stages"]["sync"] = {"status": "skipped"}
     
     # ============================================================================
     # STAGE 5: CHECK INDEX STATUS (optional)
     # ============================================================================
     if check_status_after and not skip_sync:
-        print("\n" + "=" * 80)
-        print("📊 STAGE 5: INDEX STATUS CHECK")
-        print("=" * 80 + "\n")
+        logger.info("=" * 80)
+        logger.info("STAGE 5: INDEX STATUS CHECK")
+        logger.info("=" * 80)
         
         try:
             status_results = check_all_indices_status(sources=sources)
@@ -180,12 +187,13 @@ def run_full_pipeline(
                 "status": "success",
                 "statuses": status_results
             }
+            logger.info("Index status check completed successfully")
         except Exception as e:
             results["stages"]["status_check"] = {
                 "status": "failed",
                 "error": str(e)
             }
-            print(f"⚠️  Status check failed: {e}\n")
+            logger.exception("Index status check failed: %s", e)
     
     # ============================================================================
     # PIPELINE SUMMARY
@@ -196,24 +204,23 @@ def run_full_pipeline(
     results["end_time"] = end_time.isoformat()
     results["duration_seconds"] = duration.total_seconds()
     
-    print("\n" + "=" * 80)
-    print("🎉 PIPELINE EXECUTION COMPLETE")
-    print("=" * 80)
-    print(f"⏰ Finished at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"⏱️  Total duration: {duration}")
-    print("\n📋 Stage Summary:")
+    logger.info("=" * 80)
+    logger.info("PIPELINE EXECUTION COMPLETE")
+    logger.info("=" * 80)
+    logger.info("Pipeline finished at: %s", end_time.strftime('%Y-%m-%d %H:%M:%S'))
+    logger.info("Total pipeline duration: %s", duration)
+    logger.info("Stage Summary:")
     
     for stage, info in results["stages"].items():
         status = info.get("status", "unknown")
-        emoji = "✅" if status == "success" else "❌" if status == "failed" else "⏭️"
-        print(f"   {emoji} {stage.upper()}: {status}")
+        logger.info("  %s: %s", stage.upper(), status)
     
-    print("=" * 80 + "\n")
+    logger.info("=" * 80)
     
     return results
 
 
-def run_ingestion_only(sources: Optional[List[str]] = None) -> dict:
+def run_ingestion_only(sources: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Run only the ingestion stage.
     
@@ -223,11 +230,11 @@ def run_ingestion_only(sources: Optional[List[str]] = None) -> dict:
     Returns:
         Ingestion results
     """
-    print("\n🔹 Running ingestion-only pipeline\n")
+    logger.info("Executing ingestion-only pipeline")
     return ingest_all_sources(sources=sources)
 
 
-def run_vectorization_only(sources: Optional[List[str]] = None, use_translated: bool = True) -> dict:
+def run_vectorization_only(sources: Optional[List[str]] = None, use_translated: bool = True) -> Dict[str, Any]:
     """
     Run only the vectorization stage.
     
@@ -238,11 +245,11 @@ def run_vectorization_only(sources: Optional[List[str]] = None, use_translated: 
     Returns:
         Vectorization results
     """
-    print("\n🔹 Running vectorization-only pipeline\n")
+    logger.info("Executing vectorization-only pipeline")
     return vectorize_all_sources(sources=sources, use_translated_enforcement=use_translated)
 
 
-def run_sync_only(sources: Optional[List[str]] = None) -> dict:
+def run_sync_only(sources: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Run only the index sync stage.
     
@@ -252,7 +259,7 @@ def run_sync_only(sources: Optional[List[str]] = None) -> dict:
     Returns:
         Sync results
     """
-    print("\n🔹 Running sync-only pipeline\n")
+    logger.info("Executing sync-only pipeline")
     return sync_all_indices(sources=sources)
 
 
