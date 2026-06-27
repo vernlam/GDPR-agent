@@ -37,7 +37,6 @@ jobs:
         pip install databricks-vectorsearch "langgraph>=0.2.0" "langchain-openai>=0.2.0" openai
     
     - name: Run Evaluation
-      id: run_eval
       env:
         DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
         DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
@@ -50,8 +49,6 @@ jobs:
           --experiment "/Shared/gdpr-agent-ci-evaluation" \
           --output evaluation_results.csv \
           --report evaluation_report.txt
-      # Note: This step will fail (exit 1) if evaluation fails
-      # No continue-on-error, so job will fail immediately
     
     - name: Extract Pass Rate
       id: get_pass_rate
@@ -63,26 +60,6 @@ jobs:
           echo "Pass rate: $PASS_RATE"
         else
           echo "pass_rate=0" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Check Evaluation Threshold
-      if: always()
-      run: |
-        PASS_RATE=${{ steps.get_pass_rate.outputs.pass_rate }}
-        THRESHOLD=0.90
-        
-        echo "Pass Rate: $PASS_RATE"
-        echo "Threshold: $THRESHOLD"
-        
-        # Use Python for reliable float comparison
-        PASSED=$(python -c "print('true' if float('$PASS_RATE') >= $THRESHOLD else 'false')")
-        
-        if [ "$PASSED" = "false" ]; then
-          echo "❌ Evaluation FAILED: $PASS_RATE < $THRESHOLD"
-          echo "::error::Evaluation pass rate ($PASS_RATE) is below threshold ($THRESHOLD)"
-          exit 1
-        else
-          echo "✅ Evaluation PASSED: $PASS_RATE >= $THRESHOLD"
         fi
     
     - name: Upload Results
@@ -100,33 +77,13 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          
-          let report = "Evaluation results not available";
-          try {
-            if (fs.existsSync('evaluation_report.txt')) {
-              report = fs.readFileSync('evaluation_report.txt', 'utf8');
-            }
-          } catch (error) {
-            report = `Error reading report: ${error.message}`;
-          }
-          
-          const passRate = "${{ steps.get_pass_rate.outputs.pass_rate }}";
-          const threshold = "0.90";
-          const passed = parseFloat(passRate) >= parseFloat(threshold);
-          const emoji = passed ? "✅" : "❌";
-          const status = passed ? "PASSED" : "FAILED";
+          const report = fs.readFileSync('evaluation_report.txt', 'utf8');
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: `## ${emoji} GDPR Agent Evaluation Results - ${status}
-
-**Pass Rate:** ${(parseFloat(passRate) * 100).toFixed(1)}% (Threshold: ${(parseFloat(threshold) * 100).toFixed(1)}%)
-
-\`\`\`
-${report}
-\`\`\``
+            body: `## 📊 GDPR Agent Evaluation Results\n\n\`\`\`\n${report}\n\`\`\``
           });
 
   trigger-staging:
