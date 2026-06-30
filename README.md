@@ -147,7 +147,7 @@ I analysed weaker queries and noticed a pattern: the router prompt asked *"Which
 * I added a parallel retrieval node that iterates over the source list and calls each retrieval tool, before concatenating the results into a single context.
 * In a later step, I added in the completeness check node that evaluates the generated answer against the original question, where if missing information is detected, it routes back to the router to trigger retrieval from additional sources.
 
-**What I Learned:** \
+**What I Learned:** 
 * Prompt Engineering can change the LLM routing behaviour
 * Self-correction loops are essential. Including the completeness check as a safety net catches edge cases
 * By storing `sources_used` in State, it guided the router towards unexplored sources
@@ -185,9 +185,11 @@ I deliberately chose to implement routing logic in Python rather than relying on
 
 ### Mistakes & Missteps
 
-**Not writing unit tests**
+**Not writing unit tests while developing**
 
 I didn't write unit tests because this was a personal learning project on Databricks and I figured I was the only person who'd touch the code. This turned out to be a mistake that cost me debugging time later. Whenever I changed the router logic to support multi-source retrieval, I had no way to verify whether each component worked without running the entire agent end-to-end.
+
+I should've written unit tests as I was developing the code base as I went through it. However, I added unit tests retrospectively, but coverage is intentionally limited to core utility functions. Infrastructure-heavy code (Spark pipelines, LangGraph nodes) was excluded as the integration tests and CI/CD eval harness provide better signal for those components.
 
 **What I should have tested:**
 
@@ -203,30 +205,6 @@ Monitoring queries: Do the SQL queries in monitoring modules return expected agg
 **Latency Reduction Techniques** 
 
 Look through tracing to identify areas of possible latency reduction. The current average latency per query is high, around 20 seconds. There are opportunities to reduce this via techniques such as semantic caching, and reviewing which steps are taking the most time.
-
----
-
-## 🎓 Skills Demonstrated (Portfolio)
-
-**Agentic AI:**
-* LangGraph workflows, tool-calling, multi-step reasoning
-* RAG architecture with retrieval grading and routing
-* Self-correcting agent loops
-
-**Data Engineering:**
-* Document ingestion pipelines (PDF parsing, translation)
-* Delta Lake tables and Unity Catalog governance
-* Vector embeddings and index management
-
-**MLOps:**
-* Model evaluation frameworks (LLM-as-judge)
-* Production monitoring (quality, performance, cost)
-* CI/CD pipelines for ML (GitHub Actions)
-* Model deployment (Databricks Model Serving)
-
-**Cloud & Infrastructure:**
-* Databricks platform (Unity Catalog, Vector Search, Serverless)
-* REST API design for model serving
 
 ---
 
@@ -323,6 +301,21 @@ GDPR-agent/
 │   ├── edges.py         # Routing logic based on state
 │   ├── tools.py         # Vector search retrieval tools
 │   └── state.py         # TypedDict state schema
+├── api/                 # FastAPI service
+│   ├── main.py          # API endpoints with auth, logging, error handling
+│   ├── Dockerfile       # Container definition
+│   └── requirements.txt # API dependencies
+├── terraform/           # Infrastructure as code
+│   ├── main.tf          # GCP resources (Cloud Run, Artifact Registry, Secret Manager)
+│   ├── variables.tf     # Input variables
+│   ├── outputs.tf       # Output values
+│   └── README.md        # Deployment instructions
+├── tests/               # Unit and integration tests
+│   ├── test_chunk_text.py
+│   ├── test_spark_helpers.py
+│   ├── test_router.py
+│   └── integration/
+│       └── test_databricks_connection.py
 ├── deploy/              # Model deployment scripts
 │   ├── deploy_endpoint.py       # Databricks Model Serving setup
 │   ├── register_staging.py      # MLflow model registration
@@ -336,45 +329,34 @@ GDPR-agent/
 ├── notebooks/           # Databricks notebooks
 │   ├── Query Simulator  # Simulated user traffic generator
 │   └── Bootstrap Golden Set  # Golden question generation
-└── .github/workflows/   # CI/CD pipeline
-    └── evaluation.yml   # Automated evaluation on push
+└── .github/workflows/   # CI/CD pipelines
+    ├── eval.yml          # Automated evaluation on push to main
+    ├── staging-deploy.yml # Databricks staging deployment
+    └── deploy-api.yml    # Cloud Run API deployment
+
 ```
 
 ### REST API Implementation
 
-**Endpoint Configuration:**
-```
-https://{workspace_url}/serving-endpoints/gdpr-agent-staging/invocations
-```
+**API Endpoint:**
+https://gdpr-api-nkfxshjbea-ts.a.run.app
 
 **Request Format:**
 ```python
-payload = {
-    "dataframe_split": {
-        "columns": ["question"],
-        "data": [["What are the requirements for GDPR Article 17?"]]
-    }
-}
-
 headers = {
-    "Authorization": f"Bearer {databricks_token}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "X-API-Key": "your_api_key"
 }
 
-response = requests.post(endpoint_url, headers=headers, json=payload)
+payload = {"question": "What are the requirements for GDPR Article 17?"}
+
+response = requests.post("https://gdpr-api-nkfxshjbea-ts.a.run.app/query", headers=headers, json=payload)
+
 ```
 
 **Response Format:**
-```json
 {
-    "predictions": [{
-        "answer": "Article 17 establishes the right to erasure...",
-        "context": ["retrieved chunks"],
-        "metadata": {
-            "request_id": "uuid",
-            "sources_used": ["gdpr_law", "policy"]
-        }
-    }]
+    "answer": "Article 17 establishes the right to erasure..."
 }
 ```
 
@@ -390,4 +372,4 @@ response = requests.post(endpoint_url, headers=headers, json=payload)
 
 ---
 
-**Reflection Date:** *27 June 2026*  
+**Updated:** *30 June 2026*  
