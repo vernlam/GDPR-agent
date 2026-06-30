@@ -382,12 +382,14 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
     logger.debug("Query: %s", query_to_search[:100] + "..." if len(query_to_search) > 100 else query_to_search)
     
     already_queried = state.get("sources_queried", [])
+    newly_queried = []
     retrieved_contexts = []
 
     # Policy search
     if "policy" in already_queried:
         logger.debug("Skipping policy search — already queried in primary retrieval")
     else:
+        newly_queried.append("policy")
         try:
             policy_results = tool_search_retail_policy(query_text=query_to_search, top_k=5)
             policy_rows = policy_results.get('result', {}).get('data_array', [])
@@ -404,6 +406,7 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
     if "legislation" in already_queried:
         logger.debug("Skipping legislation search — already queried in primary retrieval")
     else:
+        newly_queried.append("legislation")
         try:
             law_results = tool_search_gdpr_legislation(query_text=query_to_search, top_k=5)
             law_rows = law_results.get('result', {}).get('data_array', [])
@@ -420,6 +423,7 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
     if "fines" in already_queried:
         logger.debug("Skipping fines search — already queried in primary retrieval")
     else:
+        newly_queried.append("fines")
         try:
             fine_results = tool_search_historical_fines(query_text=query_to_search, top_k=5)
             fine_rows = fine_results.get('result', {}).get('data_array', [])
@@ -444,6 +448,7 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
 
     return {
         "retrieved_context": combined_text,
+        "sources_queried": already_queried + newly_queried,
         "retrieval_loop_count": state["retrieval_loop_count"] + 1,
         "expanded_search_used": True
     }
