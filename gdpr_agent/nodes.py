@@ -432,13 +432,16 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
         except Exception as e:
             logger.warning("Enforcement search failed during expansion: %s", e)
     
-    combined_text = "\n\n---\n\n".join(retrieved_contexts)
-    
-    if not combined_text.strip():
-        logger.warning("Expanded search yielded no results above confidence threshold")
+    new_text = "\n\n---\n\n".join(retrieved_contexts)
+    existing_context = state.get("retrieved_context", "")
+
+    if new_text.strip():
+        logger.info("Expanded search retrieved %d total chunks from new sources", len(retrieved_contexts))
+        combined_text = (existing_context + "\n\n---\n\n" + new_text).strip() if existing_context.strip() else new_text
     else:
-        logger.info("Expanded search retrieved %d total chunks from all sources", len(retrieved_contexts))
-    
+        logger.warning("Expanded search yielded no results above confidence threshold — keeping existing context")
+        combined_text = existing_context
+
     return {
         "retrieved_context": combined_text,
         "retrieval_loop_count": state["retrieval_loop_count"] + 1,
