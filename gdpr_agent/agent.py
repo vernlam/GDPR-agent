@@ -6,6 +6,7 @@ Provides a simple interface for instantiating and invoking the agent.
 
 import os
 import logging
+import mlflow
 from typing import Dict, Any, Optional
 
 logging.basicConfig(
@@ -59,6 +60,7 @@ class GDPRAgent:
             logger.exception("Failed to initialize GDPR Agent: %s", e)
             raise
     
+    @mlflow.trace(name="gdpr_agent", span_type="CHAIN")
     def invoke(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Invoke the agent with a question.
