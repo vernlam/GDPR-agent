@@ -5,7 +5,6 @@ Provides search functionality across historical fines, GDPR legislation, and int
 
 import logging
 from typing import Optional, Dict, Any, List
-import mlflow
 from . import config
 
 logging.basicConfig(
@@ -18,7 +17,6 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # PRODUCTION TOOL 1: Historical Fines
 # ============================================================================
-@mlflow.trace(name="tool_search_historical_fines", span_type="RETRIEVER")
 def tool_search_historical_fines(
     query_text: str, 
     query_vector: Optional[List[float]] = None, 
@@ -83,7 +81,6 @@ def tool_search_historical_fines(
 # ============================================================================
 # PRODUCTION TOOL 2: GDPR Legislation
 # ============================================================================
-@mlflow.trace(name="tool_search_gdpr_legislation", span_type="RETRIEVER")
 def tool_search_gdpr_legislation(
     query_text: str, 
     query_vector: Optional[List[float]] = None, 
@@ -146,7 +143,6 @@ def tool_search_gdpr_legislation(
 # ============================================================================
 # PRODUCTION TOOL 3: Internal Corporate Policy
 # ============================================================================
-@mlflow.trace(name="tool_search_retail_policy", span_type="RETRIEVER")
 def tool_search_retail_policy(
     query_text: str, 
     query_vector: Optional[List[float]] = None, 
