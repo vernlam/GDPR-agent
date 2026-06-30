@@ -72,7 +72,8 @@ def grade_retrieved_context(user_question: str, retrieved_context: str) -> bool:
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.0,
-            seed=42
+            seed=42,
+            max_tokens=10
         )
     except Exception as e:
         logger.exception("Failed to call OpenAI API for context grading: %s", e)
@@ -133,7 +134,8 @@ def grade_answer_groundedness(generated_answer: str, retrieved_context: str) -> 
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.0,
-            seed=42
+            seed=42,
+            max_tokens=50
         )
     except Exception as e:
         logger.exception("Failed to call OpenAI API for groundedness grading: %s", e)

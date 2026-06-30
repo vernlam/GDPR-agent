@@ -65,9 +65,9 @@ def edge_verify_output(state: AgentState) -> str:
         Next node name: 'end' or 'regenerate_strict'
     """
     if state["generation_loop_count"] >= 3:
-        logger.warning("Max generation loops reached (count=%d). Ending verification loop to prevent infinite run.", 
+        logger.warning("Max generation loops reached (count=%d). Returning fallback with groundedness warning.",
                       state["generation_loop_count"])
-        return "end"
+        return "return_fallback"
     
     logger.debug("Verifying answer groundedness. Generation loop count: %d", 
                 state["generation_loop_count"])
