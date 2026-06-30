@@ -339,7 +339,9 @@ GDPR-agent/
 ### REST API Implementation
 
 **API Endpoint:**
+```
 https://gdpr-api-nkfxshjbea-ts.a.run.app
+```
 
 **Request Format:**
 ```python
@@ -351,10 +353,10 @@ headers = {
 payload = {"question": "What are the requirements for GDPR Article 17?"}
 
 response = requests.post("https://gdpr-api-nkfxshjbea-ts.a.run.app/query", headers=headers, json=payload)
-
 ```
 
 **Response Format:**
+```json
 {
     "answer": "Article 17 establishes the right to erasure..."
 }
