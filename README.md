@@ -204,7 +204,13 @@ Monitoring queries: Do the SQL queries in monitoring modules return expected agg
 
 **Latency Reduction Techniques** 
 
-Look through tracing to identify areas of possible latency reduction. The current average latency per query is high, around 20 seconds. There are opportunities to reduce this via techniques such as semantic caching, and reviewing which steps are taking the most time.
+Using MLflow tracing to drill into individual node execution times, average end-to-end latency was reduced from ~20s to ~11s through three targeted changes:
+
+1. **Removed the LLM relevance grader (–2–4s per query).** `edge_evaluate_context` previously called `gpt-4o-mini` to grade whether the retrieved context was relevant to the question. This was replaced with a simple emptiness check — if vector search returned any content above the 0.35 confidence threshold, it is treated as valid. The LLM call was redundant because the vector search already filters by semantic similarity at retrieval time.
+
+2. **Added a `verify_output` passthrough node (–3–5s on complete answers).** Previously, all answers — including complete, well-grounded ones — were unconditionally routed through `regenerate_strict` before the graph could terminate. A lightweight passthrough node was inserted so that answers only enter `regenerate_strict` if the groundedness check actually fails.
+
+3. **Removed a `max_tokens` cap from the groundedness grader.** A `max_tokens=50` limit was briefly applied to reduce generation time on the groundedness grader. This caused the JSON response to be truncated before the closing brace, making `json.loads` fail on every call. The grader then defaulted to `False` (not grounded) on every query, forcing `regenerate_strict` to run on every response and hitting the generation loop limit. Removing the cap restored correct behaviour and eliminated the redundant regeneration cycles.
 
 ---
 
@@ -258,11 +264,10 @@ Look through tracing to identify areas of possible latency reduction. The curren
 │                   LangGraph Agent                            │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  1. Router → Identify data sources needed            │   │
-│  │  2. Parallel Retrieval → Query vector indexes        │   │
-│  │  3. Relevance Grading → Filter context               │   │
-│  │  4. Generation → Create answer                       │   │
-│  │  5. Quality Checks → Completeness & Groundedness     │   │
-│  │  6. Self-Correction Loop (if needed)                 │   │
+│  │  2. Sequential Retrieval → Query vector indexes       │   │
+│  │  3. Generation → Create answer                       │   │
+│  │  4. Quality Checks → Completeness & Groundedness     │   │
+│  │  5. Self-Correction Loop (if needed)                 │   │
 │  └──────────────────────────────────────────────────────┘   │
 └──────────────────────────┬──────────────────────────────────┘
                            │
