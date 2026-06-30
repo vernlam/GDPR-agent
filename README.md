@@ -247,20 +247,31 @@ Look through tracing to identify areas of possible latency reduction. The curren
 * **MLflow** - Experiment tracking and model versioning
 
 **Infrastructure:**
-* **GitHub Actions** - CI/CD pipeline for automated evaluation
+* **GitHub Actions** - CI/CD pipeline for automated evaluation and FastAPI Deployment
 * **Databricks Jobs** - Scheduled query simulation and monitoring
 * **Python** - Primary language for agent logic and monitoring
+* **FastAPI** - REST API framework wrapping the Databricks agent endpoint with auth and request validation
+* **Docker** - Containerising the FastAPI app for deployment
+* **GCP Cloud Run** - Severless container hosting that scales to zero when idle
+* **Terraform** - IaaC managing Cloud Run, Artifact Registry, and Secret Manager resources
+* **GCP Secret Manager** - Secure storage for Databricks credentials and API Keys
 
 ### System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       User Query                             │
+│                       Client / User                          │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
+                           │  POST /query + X-API-Key
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Model Serving REST API                          │
+│              GCP Cloud Run (FastAPI)                         │
+│              API key auth · error handling · logging         │
+└──────────────────────────┬──────────────────────────────────┘
+                           │  Bearer token (from Secret Manager)
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Databricks Model Serving REST API               │
 │              (gdpr-agent-staging endpoint)                   │
 └──────────────────────────┬──────────────────────────────────┘
                            │
@@ -290,6 +301,7 @@ Look through tracing to identify areas of possible latency reduction. The curren
 │           RequestLogger → Delta Table Logging                │
 │  (Automatic response classification & metrics capture)      │
 └─────────────────────────────────────────────────────────────┘
+
 ```
 
 ### Key Unity Catalog Tables
