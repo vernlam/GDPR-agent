@@ -1,0 +1,34 @@
+name: Deploy API on Cloud Run
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'api/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Configure Docker
+      run: |
+        gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+    
+    - name: Build and Push Docker Image
+      run: |
+        docker build -t australia-southeast1-docker.pkg.dev/gdpr-agent-api/gdpr-api/gdpr-api:latest ./api
+        docker push australia-southeast1-docker.pkg.dev/gdpr-agent-api/gdpr-api/gdpr-api:latest
+    
+    - name: Deploy Cloud Run
+      run: |
+        gcloud run services update gdpr-api --region=australia-southeast1 --image=australia-southeast1-docker.pkg.dev/gdpr-agent-api/gdpr-api/gdpr-api:latest
+      
