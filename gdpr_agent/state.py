@@ -3,7 +3,7 @@ LangGraph state schema for GDPR Agent workflow.
 Defines the shared state structure passed between all graph nodes.
 """
 
-from typing import TypedDict
+from typing import TypedDict, List
 
 
 class AgentState(TypedDict):
@@ -17,6 +17,7 @@ class AgentState(TypedDict):
     Fields:
         original_question: The user's original compliance question (immutable).
         current_query: The current search query, potentially rewritten for optimization.
+        sources_queried: The sources that the agent has already queried in.
         retrieved_context: Combined text from all retrieved document chunks with source tags.
         generated_answer: The agent's compliance answer generated from context.
         loop_count: Total number of graph iterations (safeguard against infinite loops).
