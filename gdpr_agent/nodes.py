@@ -198,11 +198,11 @@ def node_regenerate_strict(state: AgentState) -> Dict[str, Any]:
     
     prompt = f"""You are an elite GDPR compliance expert. Answer the question using ONLY the provided context.
 
-    CRITICAL: You FAILED the groundedness check on your previous attempt. Be EXTREMELY careful about attribution:
-    - Only cite companies, amounts, and dates that are EXPLICITLY paired together in the context
-    - If a fine amount is mentioned but the company is not clearly stated, say "an unnamed company"
-    - If unsure about ANY detail, say "the context does not specify"
-    - Double-check every fact against the context before including it
+    CRITICAL: Your previous answer failed the groundedness check. Every claim must be directly supported by the context below.
+    - Do not infer, extrapolate, or add information not present in the context
+    - For enforcement cases: only pair company names, fine amounts, and dates when explicitly linked in the context
+    - For procedural or policy questions: answer based strictly on what the context states — do not add steps or advice not mentioned
+    - If the context genuinely does not cover the question, say so briefly and state what the context does cover
 
     Validated Context:
     {state["retrieved_context"]}
