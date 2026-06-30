@@ -11,6 +11,7 @@ from .nodes import (
     node_generate_answer,
     node_rewrite_query,
     node_regenerate_strict,
+    node_verify_output,
     node_return_fallback,
     node_check_source_coverage,
     node_check_completeness,
@@ -61,11 +62,12 @@ def build_agent():
     workflow.add_node("generate_response", node_generate_answer)
     workflow.add_node("check_source_coverage", node_check_source_coverage)
     workflow.add_node("rewrite_query", node_rewrite_query)
+    workflow.add_node("verify_output", node_verify_output)
     workflow.add_node("regenerate_strict", node_regenerate_strict)
     workflow.add_node("return_fallback", node_return_fallback)
     workflow.add_node("check_completeness", node_check_completeness)
     workflow.add_node("expand_all_sources", node_expand_all_sources)
-    logger.debug("Added 8 nodes to workflow graph")
+    logger.debug("Added 9 nodes to workflow graph")
     
     # Set entry point
     workflow.set_entry_point("retrieve_docs")
@@ -104,20 +106,20 @@ def build_agent():
     workflow.add_edge("expand_all_sources", "generate_response")
     logger.debug("Added edge: expand_all_sources -> generate_response")
 
-    # Completeness check: incomplete -> expand, complete -> verify
+    # Completeness check: incomplete -> expand, complete -> verify output
     workflow.add_conditional_edges(
         "check_completeness",
         edge_route_after_completeness,
         {
             "expand_all_sources": "expand_all_sources",
-            "regenerate_strict": "regenerate_strict"
+            "verify_output": "verify_output"
         }
     )
-    logger.debug("Added conditional edge: check_completeness -> [expand_all_sources | regenerate_strict]")
+    logger.debug("Added conditional edge: check_completeness -> [expand_all_sources | verify_output]")
 
-    # Output verification: grounded -> end, hallucination -> regenerate or fallback
+    # Output verification: grounded -> end, not grounded -> regenerate strict or fallback
     workflow.add_conditional_edges(
-        "regenerate_strict",
+        "verify_output",
         edge_verify_output,
         {
             "end": END,
@@ -125,7 +127,11 @@ def build_agent():
             "return_fallback": "return_fallback"
         }
     )
-    logger.debug("Added conditional edge: regenerate_strict -> [end | regenerate_strict | return_fallback]")
+    logger.debug("Added conditional edge: verify_output -> [end | regenerate_strict | return_fallback]")
+
+    # After strict regeneration, re-verify (don't skip groundedness check)
+    workflow.add_edge("regenerate_strict", "verify_output")
+    logger.debug("Added edge: regenerate_strict -> verify_output")
 
     # Fallback terminates the workflow
     workflow.add_edge("return_fallback", END)

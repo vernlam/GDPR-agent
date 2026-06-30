@@ -140,15 +140,15 @@ def edge_route_after_completeness(state: AgentState) -> str:
     
     # Prevent infinite loops - only expand once
     if retry_count >= 2 or expanded_used:
-        logger.debug("Proceeding to output verification (retry_count=%d or already expanded=%s)", 
+        logger.debug("Proceeding to output verification (retry_count=%d or already expanded=%s)",
                     retry_count, expanded_used)
-        return "regenerate_strict"
-    
+        return "verify_output"
+
     # If incomplete and haven't expanded yet, expand search to all sources
     if not is_complete:
         logger.debug("Answer incomplete. Expanding search to all sources.")
         return "expand_all_sources"
-    
-    # Otherwise proceed to validation
+
+    # Otherwise proceed to verification
     logger.debug("Answer complete. Proceeding to verification.")
-    return "regenerate_strict"
+    return "verify_output"

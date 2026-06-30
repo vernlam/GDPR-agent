@@ -5,6 +5,7 @@ Handles retrieval, generation, query rewriting, and quality control operations.
 
 import logging
 from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import mlflow
 from .state import AgentState
 from .tools import tool_search_retail_policy, tool_search_gdpr_legislation, tool_search_historical_fines
@@ -45,49 +46,40 @@ def node_route_and_retrieve(state: AgentState) -> Dict[str, Any]:
         logger.exception("Failed to determine query routing: %s", e)
         raise
     
-    retrieved_contexts = []
-    
-    # Query policy index
+    search_tasks = {}
     if routing.get("query_policy", False):
-        try:
-            policy_results = tool_search_retail_policy(query_text=query_to_search, top_k=3)
-            policy_rows = policy_results.get('result', {}).get('data_array', [])
-            policy_count = 0
-            for row in policy_rows:
-                if row[-1] > 0.35:
-                    retrieved_contexts.append(f"[SOURCE: Internal Retail Policy | Section: {row[0]}]\nContent: {row[1]}")
-                    policy_count += 1
-            logger.debug("Retrieved %d policy chunks above confidence threshold", policy_count)
-        except Exception as e:
-            logger.warning("Policy search failed: %s", e)
-
-    # Query legislation index
+        search_tasks["policy"] = (tool_search_retail_policy, 3)
     if routing.get("query_legislation", False):
-        try:
-            law_results = tool_search_gdpr_legislation(query_text=query_to_search, top_k=3)
-            law_rows = law_results.get('result', {}).get('data_array', [])
-            law_count = 0
-            for row in law_rows:
-                if row[-1] > 0.35:
-                    retrieved_contexts.append(f"[SOURCE: GDPR Legislation | Article: {row[0]}]\nContent: {row[1]}")
-                    law_count += 1
-            logger.debug("Retrieved %d legislation chunks above confidence threshold", law_count)
-        except Exception as e:
-            logger.warning("Legislation search failed: %s", e)
-
-    # Query fines index
+        search_tasks["legislation"] = (tool_search_gdpr_legislation, 3)
     if routing.get("query_fines", False):
-        try:
-            fine_results = tool_search_historical_fines(query_text=query_to_search, top_k=3)
-            fine_rows = fine_results.get('result', {}).get('data_array', [])
-            fine_count = 0
-            for row in fine_rows:
-                if row[-1] > 0.35:
+        search_tasks["fines"] = (tool_search_historical_fines, 3)
+
+    raw_results = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            source: executor.submit(fn, query_text=query_to_search, top_k=top_k)
+            for source, (fn, top_k) in search_tasks.items()
+        }
+        for source, future in futures.items():
+            try:
+                raw_results[source] = future.result()
+            except Exception as e:
+                logger.warning("%s search failed: %s", source, e)
+
+    retrieved_contexts = []
+    for source, results in raw_results.items():
+        rows = results.get('result', {}).get('data_array', [])
+        count = 0
+        for row in rows:
+            if row[-1] > 0.35:
+                if source == "policy":
+                    retrieved_contexts.append(f"[SOURCE: Internal Retail Policy | Section: {row[0]}]\nContent: {row[1]}")
+                elif source == "legislation":
+                    retrieved_contexts.append(f"[SOURCE: GDPR Legislation | Article: {row[0]}]\nContent: {row[1]}")
+                elif source == "fines":
                     retrieved_contexts.append(f"[SOURCE: Enforcement History & Fines Precedent]\nContent: {row[1]}")
-                    fine_count += 1
-            logger.debug("Retrieved %d enforcement chunks above confidence threshold", fine_count)
-        except Exception as e:
-            logger.warning("Enforcement search failed: %s", e)
+                count += 1
+        logger.debug("Retrieved %d %s chunks above confidence threshold", count, source)
 
     # Combine all retrieved contexts
     combined_text = "\n\n---\n\n".join(retrieved_contexts)
@@ -96,10 +88,20 @@ def node_route_and_retrieve(state: AgentState) -> Dict[str, Any]:
         logger.warning("Parallel search yielded zero results above confidence baseline (0.35)")
     else:
         logger.info("Aggregated %d cross-reference chunks for grading", len(retrieved_contexts))
+    
+    queried = []
+    if routing.get("query_policy", False):
+        queried.append("policy")
+    if routing.get("query_legislation", False):
+        queried.append("legislation")
+    if routing.get("query_fines", False):
+        queried.append("fines")
+
 
     return {
         "retrieved_context": combined_text,
-        "retrieval_loop_count": state["retrieval_loop_count"] + 1
+        "retrieval_loop_count": state["retrieval_loop_count"] + 1,
+        "sources_queried": queried
     }
 
 
@@ -371,47 +373,43 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
     logger.info("Expanding search to all sources due to insufficient primary results")
     logger.debug("Query: %s", query_to_search[:100] + "..." if len(query_to_search) > 100 else query_to_search)
     
+    already_queried = state.get("sources_queried", [])
+    all_sources = {
+        "policy": (tool_search_retail_policy, 5),
+        "legislation": (tool_search_gdpr_legislation, 5),
+        "fines": (tool_search_historical_fines, 5),
+    }
+    search_tasks = {k: v for k, v in all_sources.items() if k not in already_queried}
+
+    for source in already_queried:
+        logger.debug("Skipping %s search — already queried in primary retrieval", source)
+
+    raw_results = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            source: executor.submit(fn, query_text=query_to_search, top_k=top_k)
+            for source, (fn, top_k) in search_tasks.items()
+        }
+        for source, future in futures.items():
+            try:
+                raw_results[source] = future.result()
+            except Exception as e:
+                logger.warning("%s search failed during expansion: %s", source, e)
+
     retrieved_contexts = []
-    
-    # Search ALL 3 sources regardless of routing
-    # Policy search
-    try:
-        policy_results = tool_search_retail_policy(query_text=query_to_search, top_k=5)
-        policy_rows = policy_results.get('result', {}).get('data_array', [])
-        policy_count = 0
-        for row in policy_rows:
+    for source, results in raw_results.items():
+        rows = results.get('result', {}).get('data_array', [])
+        count = 0
+        for row in rows:
             if row[-1] > 0.35:
-                retrieved_contexts.append(f"[SOURCE: Internal Retail Policy | Section: {row[0]}]\nContent: {row[1]}")
-                policy_count += 1
-        logger.debug("Expanded search retrieved %d policy chunks", policy_count)
-    except Exception as e:
-        logger.warning("Policy search failed during expansion: %s", e)
-    
-    # Legislation search
-    try:
-        law_results = tool_search_gdpr_legislation(query_text=query_to_search, top_k=5)
-        law_rows = law_results.get('result', {}).get('data_array', [])
-        law_count = 0
-        for row in law_rows:
-            if row[-1] > 0.35:
-                retrieved_contexts.append(f"[SOURCE: GDPR Legislation | Article: {row[0]}]\nContent: {row[1]}")
-                law_count += 1
-        logger.debug("Expanded search retrieved %d legislation chunks", law_count)
-    except Exception as e:
-        logger.warning("Legislation search failed during expansion: %s", e)
-    
-    # Fines search
-    try:
-        fine_results = tool_search_historical_fines(query_text=query_to_search, top_k=5)
-        fine_rows = fine_results.get('result', {}).get('data_array', [])
-        fine_count = 0
-        for row in fine_rows:
-            if row[-1] > 0.35:
-                retrieved_contexts.append(f"[SOURCE: Enforcement History & Fines Precedent]\nContent: {row[1]}")
-                fine_count += 1
-        logger.debug("Expanded search retrieved %d enforcement chunks", fine_count)
-    except Exception as e:
-        logger.warning("Enforcement search failed during expansion: %s", e)
+                if source == "policy":
+                    retrieved_contexts.append(f"[SOURCE: Internal Retail Policy | Section: {row[0]}]\nContent: {row[1]}")
+                elif source == "legislation":
+                    retrieved_contexts.append(f"[SOURCE: GDPR Legislation | Article: {row[0]}]\nContent: {row[1]}")
+                elif source == "fines":
+                    retrieved_contexts.append(f"[SOURCE: Enforcement History & Fines Precedent]\nContent: {row[1]}")
+                count += 1
+        logger.debug("Expanded search retrieved %d %s chunks", count, source)
     
     combined_text = "\n\n---\n\n".join(retrieved_contexts)
     
@@ -425,6 +423,14 @@ def node_expand_all_sources(state: AgentState) -> Dict[str, Any]:
         "retrieval_loop_count": state["retrieval_loop_count"] + 1,
         "expanded_search_used": True
     }
+
+
+# ============================================================================
+# VERIFY OUTPUT NODE (Passthrough — routing logic lives in edge_verify_output)
+# ============================================================================
+def node_verify_output(state: AgentState) -> Dict[str, Any]:
+    logger.info("Entering output verification")
+    return {}
 
 
 # ============================================================================

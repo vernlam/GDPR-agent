@@ -32,6 +32,7 @@ class AgentState(TypedDict):
     current_query: str
     
     # Retrieved content
+    sources_queried: List[str]
     retrieved_context: str
     
     # Generated output

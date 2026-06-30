@@ -88,6 +88,7 @@ class GDPRAgent:
                 "current_query": question,
                 "retrieved_context": "",
                 "generated_answer": "",
+                "sources_queried": [],
                 "retrieval_loop_count": 0,
                 "generation_loop_count": 0,
                 "is_answer_complete": True,
