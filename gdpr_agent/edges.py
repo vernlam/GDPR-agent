@@ -5,7 +5,7 @@ Implements context evaluation, output verification, and source expansion routing
 
 import logging
 from .state import AgentState
-from .graders import grade_retrieved_context, grade_answer_groundedness
+from .graders import grade_answer_groundedness
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,37 +19,21 @@ logger = logging.getLogger(__name__)
 
 def edge_evaluate_context(state: AgentState) -> str:
     """
-    Evaluates the context quality. Directs to generation or rewrite loop.
-    
-    Args:
-        state: Current agent state with retrieval context and loop count
-        
-    Returns:
-        Next node name: 'generate_response' or 'rewrite_query'
+    Evaluates context availability. Directs to generation if context exists, rewrite if empty.
+
+    Removes LLM relevance grading — vector search confidence threshold (0.35) already
+    filters irrelevant chunks at retrieval time, making a redundant LLM call unnecessary.
     """
-    # Enforce loop safety limit right at the gate
     if state["retrieval_loop_count"] >= 3:
-        logger.warning("Max search attempts reached (count=%d). Forcing transition to final answer generation.", 
+        logger.warning("Max search attempts reached (count=%d). Forcing transition to final answer generation.",
                       state["retrieval_loop_count"])
         return "generate_response"
-    
-    logger.debug("Evaluating retrieved context quality for question: %s", 
-                state["original_question"][:100] + "..." if len(state["original_question"]) > 100 else state["original_question"])
-    
-    try:
-        context_is_valid = grade_retrieved_context(
-            user_question=state["original_question"], 
-            retrieved_context=state["retrieved_context"]
-        )
-    except Exception as e:
-        logger.exception("Failed to grade retrieved context: %s", e)
-        raise
-    
-    if context_is_valid:
-        logger.debug("Context validation passed. Routing to response generation.")
+
+    if state.get("retrieved_context", "").strip():
+        logger.debug("Context present. Routing to response generation.")
         return "generate_response"
     else:
-        logger.debug("Context validation failed. Routing to query rewrite. Loop count: %d", 
+        logger.debug("Empty context. Routing to query rewrite. Loop count: %d",
                     state["retrieval_loop_count"])
         return "rewrite_query"
 

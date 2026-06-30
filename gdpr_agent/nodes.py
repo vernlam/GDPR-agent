@@ -465,6 +465,7 @@ def node_verify_output(state: AgentState) -> Dict[str, Any]:
 # ============================================================================
 # FALLBACK NODE
 # ============================================================================
+@mlflow.trace(name="return_fallback", span_type="CHAIN")
 def node_return_fallback(state: AgentState) -> Dict[str, Any]:
     """
     Add groundedness warning to answer when verification fails.
