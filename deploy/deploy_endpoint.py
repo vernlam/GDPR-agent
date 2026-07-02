@@ -79,7 +79,8 @@ def deploy_endpoint(
             workload_size=workload_size,
             scale_to_zero_enabled=scale_to_zero,
             environment_vars={
-                "OPENAI_API_KEY": "{{secrets/openai/GDPR_agent}}"
+                "OPENAI_API_KEY": "{{secrets/openai/GDPR_agent}}",
+                "MLFLOW_EXPERIMENT_NAME": "/Shared/gdpr-agent-staging"
             }
         )
     ]
